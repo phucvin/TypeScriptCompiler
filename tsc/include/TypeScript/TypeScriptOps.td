@@ -4,18 +4,19 @@
 include "TypeScriptDialect.td"
 include "TypeScriptTypes.td"
 include "TypeScriptInterfaces.td"
-include "mlir/IR/FunctionInterfaces.td"
+include "mlir/Dialect/LLVMIR/LLVMEnums.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
+include "mlir/IR/BuiltinAttributeInterfaces.td"
+include "mlir/IR/RegionKindInterface.td"
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
+include "mlir/Interfaces/FunctionInterfaces.td"
 include "mlir/Interfaces/LoopLikeInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/CopyOpInterface.td"
 include "mlir/Interfaces/CastInterfaces.td"
 include "mlir/Interfaces/LoopLikeInterface.td"
-include "mlir/IR/BuiltinAttributeInterfaces.td"
-include "mlir/IR/RegionKindInterface.td"
 
 //===----------------------------------------------------------------------===//
 // TypeScript op definitions
@@ -394,7 +395,7 @@ def TypeScript_ParseIntOp : TypeScript_Op<"parseInt"> {
     ```
   }];
 
-  let arguments = (ins AnyType:$arg, Optional<I32>:$base);
+  let arguments = (ins TypeScript_String:$arg, Optional<I32>:$base);
   let results = (outs AnyInteger:$res);
 }
 
@@ -410,7 +411,7 @@ def TypeScript_ParseFloatOp : TypeScript_Op<"parseFloat"> {
     ```
   }];
 
-  let arguments = (ins AnyType:$arg);
+  let arguments = (ins TypeScript_String:$arg);
   let results = (outs TypeScript_Number:$res);
 }
 
@@ -426,7 +427,7 @@ def TypeScript_IsNaNOp : TypeScript_Op<"isNaN"> {
     ```
   }];
 
-  let arguments = (ins AnyType:$arg);
+  let arguments = (ins TypeScript_Number:$arg);
   let results = (outs TypeScript_Boolean:$res);
 }
 
@@ -623,6 +624,10 @@ def TypeScript_CallOp : TypeScript_Op<"Call", [CallOpInterface, DeclareOpInterfa
       return {arg_operand_begin(), arg_operand_end()};
     }
 
+    MutableOperandRange getArgOperandsMutable() {
+      return getCallOperandsMutable();
+    }
+
     operand_iterator arg_operand_begin() { return operand_begin(); }
     operand_iterator arg_operand_end() { return operand_end(); }
 
@@ -638,7 +643,7 @@ def TypeScript_CallIndirectOp : TypeScript_Op<"CallIndirect", [
       DeclareOpInterfaceMethods<SymbolUserOpInterface>,
       TypesMatchWith<"callee result types match result types",
                      "callee", "results",
-                     "($_self.isa<HybridFunctionType>() ? $_self.cast<HybridFunctionType>().getResults() : $_self.cast<FunctionType>().getResults())">
+                     "(isa<HybridFunctionType>($_self) ? cast<HybridFunctionType>($_self).getResults() : cast<FunctionType>($_self).getResults())">
     ]> {
   let summary = "indirect call operation";
   let description = [{
@@ -655,11 +660,11 @@ def TypeScript_CallIndirectOp : TypeScript_Op<"CallIndirect", [
     OpBuilder<(ins "Value":$callee, CArg<"ValueRange", "{}">:$callOperands), [{
       $_state.operands.push_back(callee);
       $_state.addOperands(callOperands);
-      if (auto funcType = callee.getType().dyn_cast<FunctionType>())
+      if (auto funcType = dyn_cast<FunctionType>(callee.getType()))
       {
         $_state.addTypes(funcType.getResults());
       }
-      else if (auto hybridFuncType = callee.getType().dyn_cast<mlir::typescript::HybridFunctionType>())
+      else if (auto hybridFuncType = dyn_cast<mlir::typescript::HybridFunctionType>(callee.getType()))
       {
         $_state.addTypes(hybridFuncType.getResults());
       }
@@ -673,6 +678,10 @@ def TypeScript_CallIndirectOp : TypeScript_Op<"CallIndirect", [
     /// Get the argument operands to the called function.
     operand_range getArgOperands() {
       return {arg_operand_begin(), arg_operand_end()};
+    }
+
+    MutableOperandRange getArgOperandsMutable() {
+      return getCallOperandsMutable();
     }
 
     operand_iterator arg_operand_begin() { return ++operand_begin(); }
@@ -768,6 +777,10 @@ def TypeScript_SymbolCallInternalOp : TypeScript_Op<"SymbolCallInternal",
       return {arg_operand_begin(), arg_operand_end()};
     }
 
+    MutableOperandRange getArgOperandsMutable() {
+      return getCallOperandsMutable();
+    }
+
     operand_iterator arg_operand_begin() { return operand_begin(); }
     operand_iterator arg_operand_end() { return operand_end(); }
 
@@ -791,7 +804,7 @@ def TypeScript_CallInternalOp : TypeScript_Op<"CallInternal",
     OpBuilder<(ins "Value":$callee, CArg<"ValueRange", "{}">:$callOperands), [{
       $_state.operands.push_back(callee);
       $_state.addOperands(callOperands);
-      $_state.addTypes(callee.getType().cast<FunctionType>().getResults());
+      $_state.addTypes(cast<FunctionType>(callee.getType()).getResults());
     }]>];
 
   let extraClassDeclaration = [{
@@ -801,6 +814,10 @@ def TypeScript_CallInternalOp : TypeScript_Op<"CallInternal",
       return {arg_operand_begin(), arg_operand_end()};
     }
 
+    MutableOperandRange getArgOperandsMutable() {
+      return getCallOperandsMutable();
+    }
+    
     operand_iterator arg_operand_begin() { return operand_begin(); }
     operand_iterator arg_operand_end() { return operand_end(); }
 
@@ -818,10 +835,10 @@ def TypeScript_CallHybridInternalOp : TypeScript_Op<"CallHybridInternal",
      DeclareOpInterfaceMethods<SymbolUserOpInterface>,
      TypesMatchWith<"callee input types match argument types",
                     "callee", "callOperands",
-                    "$_self.cast<mlir::typescript::HybridFunctionType>().getInputs()">,
+                    "cast<mlir::typescript::HybridFunctionType>($_self).getInputs()">,
      TypesMatchWith<"callee result types match result types",
                     "callee", "results",
-                    "$_self.cast<mlir::typescript::HybridFunctionType>().getResults()">
+                    "cast<mlir::typescript::HybridFunctionType>($_self).getResults()">
     ]> {
   let summary = "call (hybrid) internal operation";
   let description = [{
@@ -835,6 +852,10 @@ def TypeScript_CallHybridInternalOp : TypeScript_Op<"CallHybridInternal",
     operand_range getArgOperands() 
     {
       return {arg_operand_begin(), arg_operand_end()};
+    }
+
+    MutableOperandRange getArgOperandsMutable() {
+      return getCallOperandsMutable();
     }
 
     operand_iterator arg_operand_begin() { return operand_begin(); }
@@ -869,12 +890,175 @@ def TypeScript_ParamOp : TypeScript_Op<"Param", []> {
   }];
 
   let arguments = (ins
-    AnyType:$argValue, OptionalAttr<BoolAttr>:$captured
+    AnyType:$argValue, OptionalAttr<BoolAttr>:$captured, OptionalAttr<IndexAttr>:$diArgNumber
   );
 
   let results = (outs
     Res<TypeScript_AnyRefLike, "", [MemAlloc]>:$reference
   );
+}
+
+def TypeScript_ParamOptionalOp : TypeScript_Op<"ParamOpt", [SingleBlockImplicitTerminator<"typescript::ParamDefaultValueOp">]> {
+  let summary = [{
+    Allocate an parameter object in memory.
+  }];
+
+  let description = [{
+
+    ```mlir
+    %0 = ts.param_opt : !ts.optional<f32>
+    ```
+  }];
+
+  let arguments = (ins
+    TypeScript_AnyOptional:$argValue, OptionalAttr<BoolAttr>:$captured, OptionalAttr<IndexAttr>:$diArgNumber
+  );
+
+  let results = (outs
+    Res<TypeScript_AnyRefLike, "", [MemAlloc]>:$reference
+  );
+
+  let regions = (region AnyRegion:$defaultValueRegion);
+
+  let extraClassDeclaration = [{
+    OpBuilder getDefaultValueBuilder(OpBuilder::Listener *listener = nullptr) {
+      Block* body = getBody(0);
+      return OpBuilder::atBlockEnd(body, listener);
+    }
+  }];
+
+}
+
+def TypeScript_ParamDefaultValueOp : TypeScript_Op<"DefaultValue", [Pure, ReturnLike, Terminator,
+                               ParentOneOf<["ParamOptionalOp"]>]> {
+  let arguments = (ins Variadic<AnyType>:$results);
+
+  let builders = [OpBuilder<(ins), [{ /* nothing to do */ }]>]; 
+}
+
+def TypeScript_OptionalOp : TypeScript_Op<"Optional", 
+    [TypesMatchWith<"type of 'value' matches element type of 'optional'",
+                     "res", "in",
+                     "cast<OptionalType>($_self).getElementType()">]> {
+  let description = [{
+    Example:
+      ts.optional %v, %f : i32, bool to ts.optional<i32>
+  }];
+  let arguments = (ins AnyType:$in, TypeScript_Boolean:$flag);
+  let results = (outs TypeScript_AnyOptional:$res);
+}
+
+def TypeScript_VariableOp : TypeScript_Op<"Variable", []> {
+  let summary = [{
+    Allocate an object in stack or heap memory.
+  }];
+
+  let description = [{
+
+    ```mlir
+    %0 = ts.constant ...
+
+    %1 = ts.variable : f32
+    %2 = ts.variable init(%0): f32
+    ```
+  }];
+
+  let arguments = (ins
+    Optional<AnyType>:$initializer, OptionalAttr<BoolAttr>:$captured, OptionalAttr<IndexAttr>:$diArgNumber
+  );
+
+  let results = (outs
+    Res<TypeScript_Ref, "", [MemAlloc]>:$reference
+  );
+
+  
+}
+
+def TypeScript_DebugVariableOp : TypeScript_Op<"DebugVariable", []> {
+  let summary = [{
+    Placeholder to Generate DebugInfo for constant values.
+  }];
+
+  let description = [{
+
+    ```mlir
+    %0 = ts.constant ...
+
+    %1 = ts.debug_variable : f32
+    ```
+  }];
+
+  let arguments = (ins
+    AnyType:$initializer
+  );
+
+  let results = (outs
+  ); 
+}
+
+def TypeScript_DefaultOp : TypeScript_Op<"Default"> {
+  let description = [{
+    Example:
+      ts.default : i32
+  }];
+  let arguments = (ins );
+  let results = (outs AnyType:$res);
+}
+
+def TypeScript_OptionalValueOp : TypeScript_Op<"OptionalValue", 
+    [TypesMatchWith<"type of 'value' matches element type of 'optional'",
+                     "res", "in",
+                     "cast<OptionalType>($_self).getElementType()">]> {
+  let description = [{
+    Example:
+      ts.optional_value %v : i32 to ts.optional<i32>
+  }];
+  let arguments = (ins AnyType:$in);
+  let results = (outs TypeScript_AnyOptional:$res);
+}
+
+def TypeScript_OptionalUndefOp : TypeScript_Op<"OptionalUndef"> {
+  let description = [{
+    Example:
+      ts.optional_undef : ts.optional<i32>
+  }];
+  let arguments = (ins );
+  let results = (outs TypeScript_AnyOptional:$res);
+}
+
+def TypeScript_HasValueOp : TypeScript_Op<"HasValue"> {
+  let description = [{
+    Example:
+      ts.has_value %v : ts.optional<i32> to bool
+  }];
+  let arguments = (ins TypeScript_AnyOptional:$in);
+  let results = (outs TypeScript_Boolean:$res);
+}
+
+def TypeScript_ValueOp : TypeScript_Op<"Value", 
+    [TypesMatchWith<"type of 'value' matches element type of 'optional'",
+                     "in", "res",
+                     "cast<OptionalType>($_self).getElementType()">]> {
+  let description = [{
+    Example:
+      ts.value %v : ts.optional<i32> to i32
+  }];
+  let arguments = (ins TypeScript_AnyOptional:$in);
+  let results = (outs AnyType:$res);
+
+  let hasCanonicalizer = 1;  
+}
+
+def TypeScript_ValueOrDefaultOp : TypeScript_Op<"ValueOrDefault", 
+    [TypesMatchWith<"type of 'value' matches element type of 'optional'",
+                     "in", "res",
+                     "cast<OptionalType>($_self).getElementType()">]> {
+  let description = [{
+    Example:
+      ts.value_of_default %v : ts.optional<i32> to i32
+  }];
+  let arguments = (ins TypeScript_AnyOptional:$in);
+  let results = (outs AnyType:$res);
 }
 
 def TypeScript_OptionalValueOrDefaultOp : TypeScript_Op<"OptValueOrDefault", [SingleBlockImplicitTerminator<"typescript::ResultOp">]> {
@@ -905,164 +1089,6 @@ def TypeScript_OptionalValueOrDefaultOp : TypeScript_Op<"OptValueOrDefault", [Si
     }
   }];
 
-}
-
-def TypeScript_ParamOptionalOp : TypeScript_Op<"ParamOpt", [SingleBlockImplicitTerminator<"typescript::ParamDefaultValueOp">]> {
-  let summary = [{
-    Allocate an parameter object in memory.
-  }];
-
-  let description = [{
-
-    ```mlir
-    %0 = ts.param_opt : !ts.optional<f32>
-    ```
-  }];
-
-  let arguments = (ins
-    TypeScript_AnyOptional:$argValue, OptionalAttr<BoolAttr>:$captured
-  );
-
-  let results = (outs
-    Res<TypeScript_AnyRefLike, "", [MemAlloc]>:$reference
-  );
-
-  let regions = (region AnyRegion:$defaultValueRegion);
-
-  let extraClassDeclaration = [{
-    OpBuilder getDefaultValueBuilder(OpBuilder::Listener *listener = nullptr) {
-      Block* body = getBody(0);
-      return OpBuilder::atBlockEnd(body, listener);
-    }
-  }];
-
-}
-
-def TypeScript_ParamDefaultValueOp : TypeScript_Op<"DefaultValue", [Pure, ReturnLike, Terminator,
-                               ParentOneOf<["ParamOptionalOp"]>]> {
-  let arguments = (ins Variadic<AnyType>:$results);
-
-  let builders = [OpBuilder<(ins), [{ /* nothing to do */ }]>];
-
-  
-}
-
-def TypeScript_OptionalOp : TypeScript_Op<"Optional", 
-    [TypesMatchWith<"type of 'value' matches element type of 'optional'",
-                     "res", "in",
-                     "$_self.cast<OptionalType>().getElementType()">]> {
-  let description = [{
-    Example:
-      ts.optional %v, %f : i32, bool to ts.optional<i32>
-  }];
-  let arguments = (ins AnyType:$in, TypeScript_Boolean:$flag);
-  let results = (outs TypeScript_AnyOptional:$res);
-}
-
-def TypeScript_OptionalValueOp : TypeScript_Op<"OptionalValue", 
-    [TypesMatchWith<"type of 'value' matches element type of 'optional'",
-                     "res", "in",
-                     "$_self.cast<OptionalType>().getElementType()">]> {
-  let description = [{
-    Example:
-      ts.optional_value %v : i32 to ts.optional<i32>
-  }];
-  let arguments = (ins AnyType:$in);
-  let results = (outs TypeScript_AnyOptional:$res);
-}
-
-def TypeScript_OptionalUndefOp : TypeScript_Op<"OptionalUndef"> {
-  let description = [{
-    Example:
-      ts.optional_undef : ts.optional<i32>
-  }];
-  let arguments = (ins );
-  let results = (outs TypeScript_AnyOptional:$res);
-}
-
-def TypeScript_HasValueOp : TypeScript_Op<"HasValue"> {
-  let description = [{
-    Example:
-      ts.has_value %v : ts.optional<i32> to bool
-  }];
-  let arguments = (ins TypeScript_AnyOptional:$in);
-  let results = (outs TypeScript_Boolean:$res);
-}
-
-def TypeScript_ValueOp : TypeScript_Op<"Value", 
-    [TypesMatchWith<"type of 'value' matches element type of 'optional'",
-                     "in", "res",
-                     "$_self.cast<OptionalType>().getElementType()">]> {
-  let description = [{
-    Example:
-      ts.value %v : ts.optional<i32> to i32
-  }];
-  let arguments = (ins TypeScript_AnyOptional:$in);
-  let results = (outs AnyType:$res);
-
-  let hasCanonicalizer = 1;  
-}
-
-def TypeScript_ValueOrDefaultOp : TypeScript_Op<"ValueOrDefault", 
-    [TypesMatchWith<"type of 'value' matches element type of 'optional'",
-                     "in", "res",
-                     "$_self.cast<OptionalType>().getElementType()">]> {
-  let description = [{
-    Example:
-      ts.value_of_default %v : ts.optional<i32> to i32
-  }];
-  let arguments = (ins TypeScript_AnyOptional:$in);
-  let results = (outs AnyType:$res);
-}
-
-def TypeScript_VariableOp : TypeScript_Op<"Variable", []> {
-  let summary = [{
-    Allocate an object in stack or heap memory.
-  }];
-
-  let description = [{
-
-    ```mlir
-    %0 = ts.constant ...
-
-    %1 = ts.variable : f32
-    %2 = ts.variable init(%0): f32
-    ```
-  }];
-
-  let arguments = (ins
-    Optional<AnyType>:$initializer, OptionalAttr<BoolAttr>:$captured
-  );
-
-  let results = (outs
-    Res<TypeScript_Ref, "", [MemAlloc]>:$reference
-  );
-
-  
-}
-
-def TypeScript_DebugVariableOp : TypeScript_Op<"DebugVariable", []> {
-  let summary = [{
-    Placeholder to Generate DebugInfo for constant values.
-  }];
-
-  let description = [{
-
-    ```mlir
-    %0 = ts.constant ...
-
-    %1 = ts.debug_variable : f32
-    ```
-  }];
-
-  let arguments = (ins
-    AnyType:$initializer
-  );
-
-  let results = (outs
-  );
-
-  
 }
 
 def TypeScript_AllocaOp : TypeScript_Op<"Alloca", []> {
@@ -1644,7 +1670,7 @@ def TypeScript_WhileOp : TypeScript_Op<"While",
     [
         LoopLikeOpInterface,
         ConditionallySpeculatable,
-        DeclareOpInterfaceMethods<RegionBranchOpInterface>
+        DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getEntrySuccessorOperands"]>
     ]> {
   let summary = "a generic 'while' loop";
   let description = [{
@@ -1673,8 +1699,7 @@ def TypeScript_WhileOp : TypeScript_Op<"While",
   let regions = (region SizedRegion<1>:$cond, AnyRegion:$body);
 
   let extraClassDeclaration = [{
-    OperandRange getSuccessorEntryOperands(std::optional<unsigned int> index);
-    mlir::Region &getLoopBody() { return getBody(); }    
+    llvm::SmallVector<mlir::Region *> getLoopRegions() { return {&getCond(), &getBody()}; }    
     Speculation::Speculatability getSpeculatability() {  
         return isTrue(getCond()) 
             ? Speculation::Speculatable
@@ -1690,7 +1715,7 @@ def TypeScript_DoWhileOp : TypeScript_Op<"DoWhile",
     [
         LoopLikeOpInterface,
         ConditionallySpeculatable,
-        DeclareOpInterfaceMethods<RegionBranchOpInterface>
+        DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getEntrySuccessorOperands"]>
     ]> {
   let summary = "a generic 'do-while' loop";
   let description = [{
@@ -1702,8 +1727,7 @@ def TypeScript_DoWhileOp : TypeScript_Op<"DoWhile",
   let regions = (region AnyRegion:$body, SizedRegion<1>:$cond);
 
   let extraClassDeclaration = [{
-    OperandRange getSuccessorEntryOperands(std::optional<unsigned int> index);
-    mlir::Region &getLoopBody() { return getBody(); }
+    llvm::SmallVector<mlir::Region *> getLoopRegions() { return {&getBody(), &getCond()}; }
     Speculation::Speculatability getSpeculatability() {  
         return isTrue(getCond()) 
             ? Speculation::Speculatable
@@ -1719,7 +1743,7 @@ def TypeScript_ForOp : TypeScript_Op<"For",
     [
         LoopLikeOpInterface,
         ConditionallySpeculatable,
-        DeclareOpInterfaceMethods<RegionBranchOpInterface>
+        DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getEntrySuccessorOperands"]>
     ]> {
   let summary = "a generic 'for' loop";
 
@@ -1728,8 +1752,7 @@ def TypeScript_ForOp : TypeScript_Op<"For",
   let regions = (region SizedRegion<1>:$cond, AnyRegion:$body, SizedRegion<1>:$incr);
 
   let extraClassDeclaration = [{
-    OperandRange getSuccessorEntryOperands(std::optional<unsigned int> index);
-    mlir::Region &getLoopBody() { return getBody(); }
+    llvm::SmallVector<mlir::Region *> getLoopRegions() { return {&getCond(), &getBody(), &getIncr()}; }
     Speculation::Speculatability getSpeculatability() {  
         return isTrue(getCond()) || isEmpty(getCond()) 
             ? Speculation::Speculatable
@@ -1860,7 +1883,7 @@ def TypeScript_MergeOp : TypeScript_Op<"Merge", [Pure, HasParent<"SwitchOp, Labe
 }
 
 def TypeScript_TryOp : TypeScript_Op<"Try",
-    [DeclareOpInterfaceMethods<RegionBranchOpInterface>]> {
+    [DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getEntrySuccessorOperands"]>]> {
   let summary = "a generic 'try' clause";
   let description = [{
     This operation represents a generic "try" clause.
@@ -1869,12 +1892,6 @@ def TypeScript_TryOp : TypeScript_Op<"Try",
   let arguments = (ins );
   let results = (outs );
   let regions = (region AnyRegion:$body, AnyRegion:$cleanup, AnyRegion:$catches, AnyRegion:$finally);
-
-  let extraClassDeclaration = [{
-    OperandRange getSuccessorEntryOperands(std::optional<unsigned int> index);
-  }];
-
-  
 }
 
 def TypeScript_CatchOp : TypeScript_Op<"Catch",
@@ -2017,14 +2034,17 @@ def TypeScript_GlobalOp : TypeScript_Op<"Global",
     TypeAttr:$type,
     UnitAttr:$constant,
     StrAttr:$sym_name,
-    OptionalAttr<AnyAttr>:$value
+    Linkage:$linkage,
+    OptionalAttr<AnyAttr>:$value,
+    OptionalAttr<I32Attr>:$comdat
   );
 
   let regions = (region AnyRegion:$initializer);
-
   let builders = [
-    OpBuilder<(ins "Type":$type, "bool":$isConstant, "StringRef":$name, 
-        "Attribute":$value, "ArrayRef<NamedAttribute>":$attrs)>
+    OpBuilder<(ins "Type":$type, "bool":$isConstant, "StringRef":$name, "LLVM::Linkage":$linkage)>,
+    OpBuilder<(ins "Type":$type, "bool":$isConstant, "StringRef":$name, "LLVM::Linkage":$linkage, "Attribute":$value)>,
+    OpBuilder<(ins "Type":$type, "bool":$isConstant, "StringRef":$name, "LLVM::Linkage":$linkage, "ArrayRef<NamedAttribute>":$attrs)>,
+    OpBuilder<(ins "Type":$type, "bool":$isConstant, "StringRef":$name, "LLVM::Linkage":$linkage, "Attribute":$value, "ArrayRef<NamedAttribute>":$attrs)>    
   ];
 
   let extraClassDeclaration = [{
@@ -2052,13 +2072,13 @@ def TypeScript_GlobalResultOp : TypeScript_Op<"GlobalResult", [Pure, ReturnLike,
 }
 
 def TypeScript_GlobalConstructorOp : TypeScript_Op<"GlobalConstructor"> {
-  let arguments = (ins FlatSymbolRefAttr:$global_name);
+  let arguments = (ins FlatSymbolRefAttr:$global_name, IndexAttr:$priority);
   let results = (outs );
 
   let builders = [
-    OpBuilder<(ins "FuncOp":$func, CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs),
+    OpBuilder<(ins "FuncOp":$func, "IntegerAttr":$priority, CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs),
     [{
-      build($_builder, $_state, RefType::get(func.getFunctionType()), func.getName());
+      build($_builder, $_state, RefType::get(func.getFunctionType()), FlatSymbolRefAttr::get(func.getNameAttr()), priority);
       $_state.addAttributes(attrs);
     }]>
   ];
@@ -2069,8 +2089,13 @@ def TypeScript_GlobalConstructorOp : TypeScript_Op<"GlobalConstructor"> {
   }];
 }
 
+def TypeScript_AppendToUsedOp : TypeScript_Op<"AppendToUsed"> {
+  let arguments = (ins FlatSymbolRefAttr:$global_name);
+  let results = (outs );
+}
+
 def TypeScript_BodyInternalOp : TypeScript_Op<"BodyInternal",
-    [DeclareOpInterfaceMethods<RegionBranchOpInterface>, SingleBlockImplicitTerminator<"typescript::BodyResultInternalOp">]> {
+    [DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getEntrySuccessorOperands"]>, SingleBlockImplicitTerminator<"typescript::BodyResultInternalOp">]> {
   let summary = "a generic 'body'";
 
   let arguments = (ins );
@@ -2081,8 +2106,6 @@ def TypeScript_BodyInternalOp : TypeScript_Op<"BodyInternal",
       [{ attr-dict `->` type($results) `:` $body }];
 
   let extraClassDeclaration = [{
-    OperandRange getSuccessorEntryOperands(std::optional<unsigned int> index);
-
     Region &getBodyRegion() {
       return getOperation()->getRegion(0);
     }
@@ -2188,7 +2211,7 @@ def TypeScript_CopyStructOp : TypeScript_Op<"CopyStruct", [CopyOpInterface, AllT
 }
 
 def TypeScript_MemoryCopyOp : TypeScript_Op<"MemoryCopy", [CopyOpInterface, AllTypesMatch<["dst", "src"]>]> {
-  let arguments = (ins Arg<AnyType, "copy to", [MemWrite]>:$dst, Arg<AnyType, "copy from", [MemRead]>:$src, I32:$count);
+  let arguments = (ins Arg<AnyType, "copy to", [MemWrite]>:$dst, Arg<AnyType, "copy from", [MemRead]>:$src, Index:$count);
   let results = (outs );
 
   let extraClassDeclaration = [{

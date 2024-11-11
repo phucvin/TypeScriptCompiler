@@ -70,21 +70,23 @@ enum class Select: int
 
 struct VariableClass
 {
-    VariableClass() : type{VariableType::Const}, isExport{false}, isImport{false}, isPublic{false}, isUsing{false}, isAppendingLinkage{false}, comdat{Select::NotSet}
+    VariableClass() : type{VariableType::Const}, isExport{false}, isImport{false}, isDynamicImport{false}, isPublic{false}, isUsing{false}, isAppendingLinkage{false}, comdat{Select::NotSet}, isUsed{false}
     {
     }
 
-    VariableClass(VariableType type_) : type{type_}, isExport{false}, isImport{false}, isPublic{false}, isUsing{false}, isAppendingLinkage{false}, comdat{Select::NotSet}
+    VariableClass(VariableType type_) : type{type_}, isExport{false}, isImport{false}, isDynamicImport{false}, isPublic{false}, isUsing{false}, isAppendingLinkage{false}, comdat{Select::NotSet}, isUsed{false}
     {
     }
 
     VariableType type;
     bool isExport;
     bool isImport;
+    bool isDynamicImport;
     bool isPublic;
     bool isUsing;
     bool isAppendingLinkage;
     Select comdat;
+    bool isUsed;
 
     inline VariableClass& operator=(VariableType type_) { type = type_; return *this; }
 
@@ -672,7 +674,7 @@ struct ClassInfo
 
     unsigned fieldsCount()
     {
-        auto storageClass = classType.getStorageType().cast<mlir_ts::ClassStorageType>();
+        auto storageClass = cast<mlir_ts::ClassStorageType>(classType.getStorageType());
         return storageClass.size();
     }
 
@@ -680,7 +682,7 @@ struct ClassInfo
     {
         if (index >= 0)
         {
-            auto storageClass = classType.getStorageType().cast<mlir_ts::ClassStorageType>();
+            auto storageClass = cast<mlir_ts::ClassStorageType>(classType.getStorageType());
             return storageClass.getFieldInfo(index);
         }
 
@@ -690,7 +692,7 @@ struct ClassInfo
     mlir_ts::FieldInfo findField(mlir::Attribute id, bool &foundField)
     {
         foundField = false;
-        auto storageClass = classType.getStorageType().cast<mlir_ts::ClassStorageType>();
+        auto storageClass = cast<mlir_ts::ClassStorageType>(classType.getStorageType());
         auto index = storageClass.getIndex(id);
         if (index >= 0)
         {

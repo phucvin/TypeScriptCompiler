@@ -75,7 +75,7 @@ void printLocation(llvm::raw_ostream &os, mlir::Location location, llvm::StringR
 
                 if (!notFirst)
                 {
-                    if (auto fileLineColLoc = loc.template dyn_cast<mlir::FileLineColLoc>())
+                    if (auto fileLineColLoc = mlir::dyn_cast<mlir::FileLineColLoc>(loc))
                     {
                         currentPath = fileLineColLoc.getFilename().getValue();
                     }
@@ -84,14 +84,14 @@ void printLocation(llvm::raw_ostream &os, mlir::Location location, llvm::StringR
                 notFirst = true;
             }
 
-            if (auto fileLineColLoc = fusedLoc.getMetadata().template dyn_cast<mlir::FileLineColLoc>())
+            if (auto locAsMetadata = mlir::dyn_cast<mlir::LocationAttr>(fusedLoc.getMetadata()))
             {
                 if (notFirst)
                 {
                     os << ' ' << '-' << ' ';
                 }
 
-                printLocation(os, fileLineColLoc, currentPath, true);
+                printLocation(os, locAsMetadata, currentPath, true);
             }
 
             if (!suppressSeparator)

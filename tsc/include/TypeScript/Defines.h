@@ -2,7 +2,7 @@
 #define DEFINES_H_
 
 #define IDENTIFIER_ATTR_NAME "identifier"
-#define VIRTUALFUNC_ATTR_NAME "__virt"
+#define BUILTIN_FUNC_ATTR_NAME "__builtin"
 #define GENERIC_ATTR_NAME "__generic"
 #define INSTANCES_COUNT_ATTR_NAME "InstancesCount"
 #define RETURN_VARIABLE_NAME ".return"
@@ -41,6 +41,8 @@
 #define GENERATOR_SWITCHSTATE ".switchstate"
 #define GENERATOR_STATELABELPREFIX ".state"
 
+#define MLIR_GCTORS "__mlir_gctors"
+
 #define TO_STRING "toString"
 #define SYMBOL_TO_STRING_TAG "toStringTag"
 #define SYMBOL_ITERATOR "iterator"
@@ -50,7 +52,10 @@
 #define SYMBOL_TO_PRIMITIVE "toPrimitive"
 #define SYMBOL_DISPOSE "dispose"
 
-#define SHARED_LIB_DECLARATIONS "__decls"
+// we are using 3 underscore as this is feature of ts parser to add _ to __variables
+#define SHARED_LIB_DECLARATIONS_FILENAME "__decls.ts"
+#define SHARED_LIB_DECLARATIONS_2UNDERSCORE "__decls"
+#define SHARED_LIB_DECLARATIONS "___decls"
 #define DLL_EXPORT "dllexport"
 #define DLL_IMPORT "dllimport"
 
@@ -84,5 +89,6 @@
 #define FILE_DEBUG_SCOPE "file"
 #define SUBPROGRAM_DEBUG_SCOPE "function"
 #define BLOCK_DEBUG_SCOPE "block"
+#define NAMESPACE_DEBUG_SCOPE "block"
 
 #endif // DEFINES_H_

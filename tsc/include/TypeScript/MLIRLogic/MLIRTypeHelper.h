@@ -19,33 +19,6 @@ namespace mlir_ts = mlir::typescript;
 namespace typescript
 {
 
-enum class MatchResultType
-{
-    Match,
-    NotMatchArgCount,
-    NotMatchArg,
-    NotMatchResultCount,
-    NotMatchResult
-};
-
-struct MatchResult
-{
-    MatchResultType result;
-    unsigned index;
-};
-
-enum class ExtendsResult {
-    False,
-    True,
-    Never,
-    Any
-};
-
-inline bool isTrue(ExtendsResult val)
-{
-    return val == ExtendsResult::True || val == ExtendsResult::Any;
-}
-
 class MLIRTypeHelper
 {
     mlir::MLIRContext *context;
@@ -201,22 +174,22 @@ class MLIRTypeHelper
     bool isValueType(mlir::Type typeIn)
     {
         auto type = getBaseType(typeIn);
-        return type && (type.isIntOrIndexOrFloat() || type.isa<mlir_ts::NumberType>() || type.isa<mlir_ts::BooleanType>() ||
-                        type.isa<mlir_ts::TupleType>() || type.isa<mlir_ts::ConstTupleType>() || type.isa<mlir_ts::ConstArrayType>());
+        return type && (type.isIntOrIndexOrFloat() || isa<mlir_ts::NumberType>(type) || isa<mlir_ts::BooleanType>(type) ||
+ isa<mlir_ts::TupleType>(type) || isa<mlir_ts::ConstTupleType>(type) || isa<mlir_ts::ConstArrayType>(type));
     }
 
     bool isNumericType(mlir::Type type)
     {
-        return type && (type.isIntOrIndexOrFloat() || type.isa<mlir_ts::NumberType>());
+        return type && (type.isIntOrIndexOrFloat() || isa<mlir_ts::NumberType>(type));
     }
 
     mlir::Type isBoundReference(mlir::Type elementType, bool &isBound)
     {
 #ifdef USE_BOUND_FUNCTION_FOR_OBJECTS
-        if (auto funcType = elementType.dyn_cast<mlir_ts::FunctionType>())
+        if (auto funcType = dyn_cast<mlir_ts::FunctionType>(elementType))
         {
             if (funcType.getNumInputs() > 0 &&
-                (funcType.getInput(0).isa<mlir_ts::OpaqueType>() || funcType.getInput(0).isa<mlir_ts::ObjectType>()))
+                (isa<mlir_ts::OpaqueType>(funcType.getInput(0)) || isa<mlir_ts::ObjectType>(funcType.getInput(0))))
             {
                 isBound = true;
                 return mlir_ts::BoundFunctionType::get(context, funcType);
@@ -230,17 +203,17 @@ class MLIRTypeHelper
 
     bool isNullableOrOptionalType(mlir::Type typeIn)
     {
-        if (typeIn.isa<mlir_ts::NullType>() 
-            || typeIn.isa<mlir_ts::UndefinedType>() 
-            || typeIn.isa<mlir_ts::StringType>() 
-            || typeIn.isa<mlir_ts::ObjectType>() 
-            || typeIn.isa<mlir_ts::ClassType>() 
-            || typeIn.isa<mlir_ts::InterfaceType>()
-            || typeIn.isa<mlir_ts::OptionalType>()
-            || typeIn.isa<mlir_ts::AnyType>()
-            || typeIn.isa<mlir_ts::UnknownType>()
-            || typeIn.isa<mlir_ts::RefType>()
-            || typeIn.isa<mlir_ts::ValueRefType>())
+        if (isa<mlir_ts::NullType>(typeIn) 
+            || isa<mlir_ts::UndefinedType>(typeIn) 
+            || isa<mlir_ts::StringType>(typeIn) 
+            || isa<mlir_ts::ObjectType>(typeIn) 
+            || isa<mlir_ts::ClassType>(typeIn) 
+            || isa<mlir_ts::InterfaceType>(typeIn)
+            || isa<mlir_ts::OptionalType>(typeIn)
+            || isa<mlir_ts::AnyType>(typeIn)
+            || isa<mlir_ts::UnknownType>(typeIn)
+            || isa<mlir_ts::RefType>(typeIn)
+            || isa<mlir_ts::ValueRefType>(typeIn))
         {
             return true;            
         }
@@ -253,31 +226,9 @@ class MLIRTypeHelper
         return false;
     }
 
-    mlir::Type getElementType(mlir::Type type)
+    mlir::Type getElementTypeOrSelf(mlir::Type type)
     {
-        // TODO: get type of pointer element
-        mlir::Type elementType;
-        if (type)
-        {
-            if (type.isa<mlir_ts::StringType>())
-            {
-                elementType = mlir_ts::CharType::get(context);
-            }
-            else if (auto classType = type.dyn_cast<mlir_ts::ClassType>())
-            {
-                elementType = classType.getStorageType();
-            }
-            else if (auto refType = type.dyn_cast<mlir_ts::RefType>())
-            {
-                elementType = refType.getElementType();
-            }
-            else if (auto valueRefType = type.dyn_cast<mlir_ts::ValueRefType>())
-            {
-                elementType = valueRefType.getElementType();
-            }
-        }
-
-        return elementType;
+        return MLIRHelper::getElementTypeOrSelf(type);
     }
 
     mlir::StringAttr getLabelName(mlir::Type typeIn)
@@ -294,63 +245,63 @@ class MLIRTypeHelper
         {
             return mlir::StringAttr::get(context, std::string("f") + std::to_string(typeIn.getIntOrFloatBitWidth()));
         }
-        else if (typeIn.isa<mlir_ts::NullType>())
+        else if (isa<mlir_ts::NullType>(typeIn))
         {
             return mlir::StringAttr::get(context, "null");
         }
-        else if (typeIn.isa<mlir_ts::UndefinedType>()) 
+        else if (isa<mlir_ts::UndefinedType>(typeIn)) 
         {
             return mlir::StringAttr::get(context, "undefined");
         }
-        else if (typeIn.isa<mlir_ts::NumberType>())
+        else if (isa<mlir_ts::NumberType>(typeIn))
         {
             return mlir::StringAttr::get(context, "number");
         }
-        else if (typeIn.isa<mlir_ts::TupleType>())
+        else if (isa<mlir_ts::TupleType>(typeIn))
         {
             return mlir::StringAttr::get(context, "tuple");
         }
-        else if (typeIn.isa<mlir_ts::ObjectType>())
+        else if (isa<mlir_ts::ObjectType>(typeIn))
         {
             return mlir::StringAttr::get(context, "object");
         }
-        else if (typeIn.isa<mlir_ts::StringType>()) 
+        else if (isa<mlir_ts::StringType>(typeIn)) 
         {
             return mlir::StringAttr::get(context, "string");
         }
-        else if (typeIn.isa<mlir_ts::ObjectType>())
+        else if (isa<mlir_ts::ObjectType>(typeIn))
         {
             return mlir::StringAttr::get(context, "object");
         }
-        else if (typeIn.isa<mlir_ts::ClassType>()) 
+        else if (isa<mlir_ts::ClassType>(typeIn)) 
         {
             return mlir::StringAttr::get(context, "class");
         }
-        else if (typeIn.isa<mlir_ts::InterfaceType>())
+        else if (isa<mlir_ts::InterfaceType>(typeIn))
         {
             return mlir::StringAttr::get(context, "interface");
         }
-        else if (typeIn.isa<mlir_ts::OptionalType>())
+        else if (isa<mlir_ts::OptionalType>(typeIn))
         {
             return mlir::StringAttr::get(context, "optional");
         }
-        else if (typeIn.isa<mlir_ts::AnyType>())
+        else if (isa<mlir_ts::AnyType>(typeIn))
         {
             return mlir::StringAttr::get(context, "any");
         }
-        else if (typeIn.isa<mlir_ts::UnknownType>())
+        else if (isa<mlir_ts::UnknownType>(typeIn))
         {
             return mlir::StringAttr::get(context, "unknown");
         }
-        else if (typeIn.isa<mlir_ts::RefType>())
+        else if (isa<mlir_ts::RefType>(typeIn))
         {
             return mlir::StringAttr::get(context, "ref");
         }
-        else if (typeIn.isa<mlir_ts::ValueRefType>())
+        else if (isa<mlir_ts::ValueRefType>(typeIn))
         {
             return mlir::StringAttr::get(context, "valueRef");
         }
-        else if (typeIn.isa<mlir_ts::UnionType>())
+        else if (isa<mlir_ts::UnionType>(typeIn))
         {
             return mlir::StringAttr::get(context, "union");
         }                
@@ -361,7 +312,7 @@ class MLIRTypeHelper
     mlir::Attribute convertFromFloatAttrIntoType(mlir::Attribute attr, mlir::Type destType, mlir::OpBuilder &builder)
     {
         mlir::Type srcType;
-        if (auto typedAttr = attr.dyn_cast<mlir::TypedAttr>())
+        if (auto typedAttr = dyn_cast<mlir::TypedAttr>(attr))
         {
             srcType = typedAttr.getType();
         }
@@ -389,13 +340,13 @@ class MLIRTypeHelper
         // this is Int
         if (srcType.isIntOrIndex())
         {
-            return builder.getFloatAttr(type, attr.cast<mlir::IntegerAttr>().getValue().signedRoundToDouble());
+            return builder.getFloatAttr(type, mlir::cast<mlir::IntegerAttr>(attr).getValue().signedRoundToDouble());
         }
 
         // this is Float
         if (srcType.isIntOrIndexOrFloat())
         {
-            return builder.getFloatAttr(type, attr.cast<mlir::FloatAttr>().getValue().convertToDouble());
+            return builder.getFloatAttr(type, mlir::cast<mlir::FloatAttr>(attr).getValue().convertToDouble());
         }        
 
         return mlir::Attribute();
@@ -404,7 +355,7 @@ class MLIRTypeHelper
     mlir::Attribute convertAttrIntoType(mlir::Attribute attr, mlir::Type destType, mlir::OpBuilder &builder)
     {
         mlir::Type srcType;
-        if (auto typedAttr = attr.dyn_cast<mlir::TypedAttr>())
+        if (auto typedAttr = dyn_cast<mlir::TypedAttr>(attr))
         {
             srcType = typedAttr.getType();
         }
@@ -416,7 +367,7 @@ class MLIRTypeHelper
             return attr;
         }
 
-        if (destType.isa<mlir_ts::NumberType>())
+        if (isa<mlir_ts::NumberType>(destType))
         {
 #ifdef NUMBER_F64
             return convertFromFloatAttrIntoType(attr, builder.getF64Type(), builder);
@@ -431,7 +382,7 @@ class MLIRTypeHelper
             if (srcType.isIndex())
             {
                 // index
-                auto val = attr.cast<mlir::IntegerAttr>().getValue();
+                auto val = mlir::cast<mlir::IntegerAttr>(attr).getValue();
                 APInt newVal(
                     destType.getIntOrFloatBitWidth(), 
                     val.getZExtValue());
@@ -441,7 +392,7 @@ class MLIRTypeHelper
             else if (srcType.isIntOrIndex())
             {
                 // integer
-                auto val = attr.cast<mlir::IntegerAttr>().getValue();
+                auto val = mlir::cast<mlir::IntegerAttr>(attr).getValue();
                 APInt newVal(
                     destType.getIntOrFloatBitWidth(), 
                     destType.isSignedInteger() ? val.getSExtValue() : val.getZExtValue(), 
@@ -453,7 +404,7 @@ class MLIRTypeHelper
                 // float/double
                 bool lossy;
                 APSInt newVal(destType.getIntOrFloatBitWidth(), !destType.isIndex());
-                attr.cast<mlir::FloatAttr>().getValue().convertToInteger(newVal, llvm::APFloatBase::rmNearestTiesToEven, &lossy);
+                mlir::cast<mlir::FloatAttr>(attr).getValue().convertToInteger(newVal, llvm::APFloatBase::rmNearestTiesToEven, &lossy);
                 return builder.getIntegerAttr(destType, newVal);
             }
             else
@@ -499,11 +450,11 @@ class MLIRTypeHelper
         return actualType;
     }    
 
-    mlir::Type mergeUnionType(mlir::Type type)
+    mlir::Type mergeUnionType(mlir::Location location, mlir::Type type)
     {
-        if (auto unionType = type.dyn_cast<mlir_ts::UnionType>())
+        if (auto unionType = dyn_cast<mlir_ts::UnionType>(type))
         {
-            return getUnionTypeWithMerge(unionType);
+            return getUnionTypeWithMerge(location, unionType);
         }
 
         return type;
@@ -511,7 +462,7 @@ class MLIRTypeHelper
 
     mlir::Type stripLiteralType(mlir::Type type)
     {
-        if (auto literalType = type.dyn_cast<mlir_ts::LiteralType>())
+        if (auto literalType = dyn_cast<mlir_ts::LiteralType>(type))
         {
             return literalType.getElementType();
         }
@@ -521,7 +472,7 @@ class MLIRTypeHelper
 
     mlir::Type stripOptionalType(mlir::Type type)
     {
-        if (auto optType = type.dyn_cast<mlir_ts::OptionalType>())
+        if (auto optType = dyn_cast<mlir_ts::OptionalType>(type))
         {
             return optType.getElementType();
         }
@@ -531,7 +482,7 @@ class MLIRTypeHelper
 
     mlir::Type stripRefType(mlir::Type type)
     {
-        if (auto refType = type.dyn_cast<mlir_ts::RefType>())
+        if (auto refType = dyn_cast<mlir_ts::RefType>(type))
         {
             return refType.getElementType();
         }
@@ -541,7 +492,7 @@ class MLIRTypeHelper
 
     mlir::Type convertConstArrayTypeToArrayType(mlir::Type type)
     {
-        if (auto constArrayType = type.dyn_cast<mlir_ts::ConstArrayType>())
+        if (auto constArrayType = dyn_cast<mlir_ts::ConstArrayType>(type))
         {
             return mlir_ts::ArrayType::get(constArrayType.getElementType());
         }
@@ -562,7 +513,7 @@ class MLIRTypeHelper
     mlir::Type convertConstTupleTypeToTupleType(mlir::Type type)
     {
         // tuple is value and copied already
-        if (auto constTupleType = type.dyn_cast<mlir_ts::ConstTupleType>())
+        if (auto constTupleType = dyn_cast<mlir_ts::ConstTupleType>(type))
         {
             return mlir_ts::TupleType::get(context, constTupleType.getFields());
         }
@@ -573,7 +524,7 @@ class MLIRTypeHelper
     mlir::Type convertTupleTypeToConstTupleType(mlir::Type type)
     {
         // tuple is value and copied already
-        if (auto tupleType = type.dyn_cast<mlir_ts::TupleType>())
+        if (auto tupleType = dyn_cast<mlir_ts::TupleType>(type))
         {
             return mlir_ts::ConstTupleType::get(context, tupleType.getFields());
         }
@@ -609,7 +560,7 @@ class MLIRTypeHelper
         mlir::SmallVector<mlir::Type> funcArgTypes(funcType.getInputs().begin(), funcType.getInputs().end());
         for (auto &type : funcArgTypes)
         {
-            if (type.isa<mlir_ts::OpaqueType>())
+            if (isa<mlir_ts::OpaqueType>(type))
             {
                 type = opaqueReplacementType;
                 break;
@@ -625,7 +576,7 @@ class MLIRTypeHelper
         mlir::SmallVector<mlir::Type> funcArgTypes(funcType.getInputs().begin(), funcType.getInputs().end());
         for (auto &type : funcArgTypes)
         {
-            if (type.isa<mlir_ts::OpaqueType>())
+            if (isa<mlir_ts::OpaqueType>(type))
             {
                 type = opaqueReplacementType;
                 break;
@@ -638,7 +589,7 @@ class MLIRTypeHelper
     // TODO: review virtual calls
     bool isNoneType(mlir::Type type)
     {
-        return !type || type.isa<mlir::NoneType>();
+        return !type || isa<mlir::NoneType>(type);
     }
 
     bool isEmptyTuple(mlir::Type type)
@@ -656,10 +607,10 @@ class MLIRTypeHelper
         return false;
     }
 
-    bool isVirtualFunctionType(mlir::Value actualFuncRefValue) 
+    bool isBuiltinFunctionType(mlir::Value actualFuncRefValue) 
     {
         auto attrName = StringRef(IDENTIFIER_ATTR_NAME);
-        auto virtAttrName = StringRef(VIRTUALFUNC_ATTR_NAME);
+        auto virtAttrName = StringRef(BUILTIN_FUNC_ATTR_NAME);
         auto definingOp = actualFuncRefValue.getDefiningOp();
         return (isNoneType(actualFuncRefValue.getType()) || definingOp->hasAttrOfType<mlir::BoolAttr>(virtAttrName)) 
             && definingOp->hasAttrOfType<mlir::FlatSymbolRefAttr>(attrName);
@@ -668,7 +619,7 @@ class MLIRTypeHelper
     // TODO: how about multi-index?
     mlir::Type getIndexSignatureElementType(mlir::Type indexSignatureType)
     {
-        if (auto funcType = indexSignatureType.dyn_cast<mlir_ts::FunctionType>())
+        if (auto funcType = dyn_cast<mlir_ts::FunctionType>(indexSignatureType))
         {
             if (funcType.getNumInputs() == 1 && funcType.getNumResults() == 1 && isNumericType(funcType.getInput(0)))
             {
@@ -893,7 +844,7 @@ class MLIRTypeHelper
     {
         mlir::Type paramsType;
 
-        auto isOptType = funcType.isa<mlir_ts::OptionalType>();
+        auto isOptType = isa<mlir_ts::OptionalType>(funcType);
 
         funcType = stripOptionalType(funcType);    
 
@@ -942,7 +893,7 @@ class MLIRTypeHelper
             if (inInputs[i] != resInputs[i])
             {
                 /*
-                if (i == 0 && (inFuncType.getInput(i).isa<mlir_ts::OpaqueType>() || resFuncType.getInput(i).isa<mlir_ts::OpaqueType>()))
+                if (i == 0 && (isa<mlir_ts::OpaqueType>(inFuncType.getInput(i)) || isa<mlir_ts::OpaqueType>(resFuncType.getInput(i))))
                 {
                     // allow not to match opaque time at first position
                     continue;
@@ -1010,37 +961,195 @@ class MLIRTypeHelper
             startParam);
     }
 
-    MatchResult TestFunctionTypesMatchWithObjectMethods(mlir::Type inFuncType, mlir::Type resFuncType, unsigned startParamIn = 0,
-                                                        unsigned startParamRes = 0)
-    {
-        return TestFunctionTypesMatchWithObjectMethods(inFuncType.cast<mlir_ts::FunctionType>(), resFuncType.cast<mlir_ts::FunctionType>(),
-                                                       startParamIn, startParamRes);
+    mlir_ts::FunctionType GetFunctionType(mlir_ts::HybridFunctionType hybridFuncType) {
+        return mlir_ts::FunctionType::get(hybridFuncType.getContext(), hybridFuncType.getInputs(), hybridFuncType.getResults(), hybridFuncType.isVarArg());
     }
 
-    MatchResult TestFunctionTypesMatchWithObjectMethods(mlir_ts::FunctionType inFuncType, mlir_ts::FunctionType resFuncType,
+    mlir_ts::FunctionType GetFunctionType(mlir_ts::BoundFunctionType boundFuncType) {
+        return mlir_ts::FunctionType::get(boundFuncType.getContext(), boundFuncType.getInputs(), boundFuncType.getResults(), boundFuncType.isVarArg());
+    }
+
+    mlir_ts::FunctionType GetFunctionType(mlir_ts::ExtensionFunctionType extFuncType) {
+        return mlir_ts::FunctionType::get(extFuncType.getContext(), extFuncType.getInputs(), extFuncType.getResults(), extFuncType.isVarArg());
+    }
+
+    mlir_ts::FunctionType GetFunctionType(mlir::Type inFuncType) {
+        inFuncType = stripOptionalType(inFuncType);    
+        
+        mlir_ts::FunctionType funcType;
+        mlir::TypeSwitch<mlir::Type>(inFuncType)
+            .Case<mlir_ts::FunctionType>([&](auto functionType) { funcType = functionType; })
+            .Case<mlir_ts::HybridFunctionType>([&](auto hybridFunctionType) { funcType = GetFunctionType(hybridFunctionType); })
+            .Case<mlir_ts::BoundFunctionType>([&](auto boundFunctionType) { funcType = GetFunctionType(boundFunctionType); })
+            .Case<mlir_ts::ExtensionFunctionType>([&](auto extensionFunctionType) { funcType = GetFunctionType(extensionFunctionType); })
+            .Default([&](auto type) { funcType = mlir::cast<mlir_ts::FunctionType>(inFuncType); });
+            
+        return funcType;
+    }
+
+    bool CanCastFunctionTypeToFunctionType(mlir::Type inFuncType, mlir::Type resFuncType) {
+        inFuncType = stripOptionalType(inFuncType);    
+        resFuncType = stripOptionalType(resFuncType);    
+
+        bool result = false;
+        mlir::TypeSwitch<mlir::Type>(inFuncType)
+            .Case<mlir_ts::FunctionType>([&](auto functionType) { result = CanCastFunctionTypeToFunctionType(functionType, resFuncType); })
+            .Case<mlir_ts::HybridFunctionType>([&](auto hybridFunctionType) { result = CanCastFunctionTypeToFunctionType(hybridFunctionType, resFuncType); })
+            .Case<mlir_ts::BoundFunctionType>([&](auto boundFunctionType) { result = CanCastFunctionTypeToFunctionType(boundFunctionType, resFuncType); })
+            .Case<mlir_ts::ExtensionFunctionType>([&](auto extensionFunctionType) { result = CanCastFunctionTypeToFunctionType(extensionFunctionType, resFuncType); });
+            
+        return result;
+    }    
+
+    bool CanCastFunctionTypeToFunctionType(mlir_ts::FunctionType inFuncType, mlir::Type resFuncType) {
+        bool result = false;
+        mlir::TypeSwitch<mlir::Type>(resFuncType)
+            .Case<mlir_ts::FunctionType>([&](auto functionType) { result = true; })
+            .Case<mlir_ts::HybridFunctionType>([&](auto hybridFunctionType) { result = true; })
+            .Case<mlir_ts::BoundFunctionType>([&](auto boundFunctionType) { result = false; })
+            .Case<mlir_ts::ExtensionFunctionType>([&](auto extensionFunctionType) { result = false; });
+            
+        return result;
+    }    
+
+    bool CanCastFunctionTypeToFunctionType(mlir_ts::HybridFunctionType inFuncType, mlir::Type resFuncType) {
+        bool result = false;
+        mlir::TypeSwitch<mlir::Type>(resFuncType)
+            .Case<mlir_ts::FunctionType>([&](auto functionType) { result = true; /*TODO: extra checking at runtime should be performed */ })
+            .Case<mlir_ts::HybridFunctionType>([&](auto hybridFunctionType) { result = true; })
+            .Case<mlir_ts::BoundFunctionType>([&](auto boundFunctionType) { result = true; /*TODO: extra checking at runtime should be performed */ }) 
+            .Case<mlir_ts::ExtensionFunctionType>([&](auto extensionFunctionType) { result = true; /*TODO: extra checking at runtime should be performed */ });
+            
+        return result;
+    }      
+
+    bool CanCastFunctionTypeToFunctionType(mlir_ts::BoundFunctionType inFuncType, mlir::Type resFuncType) {
+        bool result = false;
+        mlir::TypeSwitch<mlir::Type>(resFuncType)
+            .Case<mlir_ts::FunctionType>([&](auto functionType) { 
+                result = true; // yes, it is allowable. to be able to create objects with functionsi
+            })
+            .Case<mlir_ts::HybridFunctionType>([&](auto hybridFunctionType) { result = true; })
+            .Case<mlir_ts::BoundFunctionType>([&](auto boundFunctionType) { result = true; }) 
+            .Case<mlir_ts::ExtensionFunctionType>([&](auto extensionFunctionType) { result = true; });
+            
+        return result;
+    }     
+
+    bool CanCastFunctionTypeToFunctionType(mlir_ts::ExtensionFunctionType inFuncType, mlir::Type resFuncType) {
+        bool result = false;
+        mlir::TypeSwitch<mlir::Type>(resFuncType)
+            .Case<mlir_ts::FunctionType>([&](auto functionType) { result = false; })
+            .Case<mlir_ts::HybridFunctionType>([&](auto hybridFunctionType) { result = true; })
+            .Case<mlir_ts::BoundFunctionType>([&](auto boundFunctionType) { result = true; }) 
+            .Case<mlir_ts::ExtensionFunctionType>([&](auto extensionFunctionType) { result = true; });
+            
+        return result;
+    }          
+
+    bool ShouldThisParamBeIgnored(mlir::Type inFuncType, mlir::Type resFuncType) {
+        if (inFuncType == resFuncType) return false;
+        return isa<mlir_ts::BoundFunctionType>(inFuncType) || isa<mlir_ts::ExtensionFunctionType>(inFuncType);
+    }
+
+    MatchResult TestFunctionTypesMatchWithObjectMethods(mlir::Location location, mlir::Type inFuncType, mlir::Type resFuncType, unsigned startParamIn = 0,
+                                                        unsigned startParamRes = 0)
+    {
+        return TestFunctionTypesMatchWithObjectMethods(
+            location,
+            GetFunctionType(inFuncType), 
+            GetFunctionType(resFuncType), 
+            startParamIn + ShouldThisParamBeIgnored(inFuncType, resFuncType) ? 1 : 0, 
+            startParamRes + ShouldThisParamBeIgnored(resFuncType, inFuncType) ? 1 : 0);
+    }
+
+    bool isBoolType(mlir::Type type) {
+        if (isa<mlir_ts::BooleanType>(type) || isa<mlir_ts::TypePredicateType>(type)) return true;
+        return isa<mlir::IntegerType>(type) && type.getIntOrFloatBitWidth() == 1;
+    }
+
+    bool isAnyOrUnknownOrObjectType(mlir::Type type) {
+        return isa<mlir_ts::AnyType>(type) || isa<mlir_ts::UnknownType>(type) || isa<mlir_ts::ObjectType>(type);
+    }
+
+    // TODO: add types such as opt, reference, array as they may have nested types Is which is not equal
+    // TODO: add travel logic and match only simple types
+    bool canMatch(mlir::Location location, mlir::Type left, mlir::Type right) {
+        if (left == right) return true;
+
+        left = stripLiteralType(left);
+        right = stripLiteralType(right);
+
+        if (left == right) return true;
+
+        if (isBoolType(left) && isBoolType(right)) return true;
+
+        if (isAnyOrUnknownOrObjectType(left) && isAnyOrUnknownOrObjectType(right)) return true;
+
+        // opts
+        auto leftOpt = dyn_cast<mlir_ts::OptionalType>(left);
+        auto rightOpt = dyn_cast<mlir_ts::OptionalType>(right);
+        if (leftOpt && rightOpt)
+        {
+            return canMatch(location, leftOpt.getElementType(), rightOpt.getElementType());
+        }
+
+        // array 
+        auto leftArray = dyn_cast<mlir_ts::ArrayType>(left);
+        auto rightArray = dyn_cast<mlir_ts::ArrayType>(right);
+        if (leftArray && rightArray)
+        {
+            return canMatch(location, leftArray.getElementType(), rightArray.getElementType());
+        }
+
+        // funcs
+        if (isAnyFunctionType(left) && isAnyFunctionType(right)) {        
+            return TestFunctionTypesMatchWithObjectMethods(location, left, right).result == MatchResultType::Match;
+        }
+
+        auto leftClass = dyn_cast<mlir_ts::ClassType>(left);
+        auto rightClass = dyn_cast<mlir_ts::ClassType>(right);
+        if (leftClass && rightClass)
+        {
+            llvm::StringMap<std::pair<ts::TypeParameterDOM::TypePtr,mlir::Type>> typeParamsWithArgs;
+            return extendsType(location, rightClass, leftClass, typeParamsWithArgs) == ExtendsResult::True;
+        }
+
+        auto leftInteface = dyn_cast<mlir_ts::InterfaceType>(left);
+        auto rightInteface = dyn_cast<mlir_ts::InterfaceType>(right);
+        if (leftInteface && rightInteface)
+        {
+            llvm::StringMap<std::pair<ts::TypeParameterDOM::TypePtr,mlir::Type>> typeParamsWithArgs;
+            return extendsType(location, leftInteface, rightInteface, typeParamsWithArgs) == ExtendsResult::True;
+        }        
+
+        return false;
+    }
+
+    MatchResult TestFunctionTypesMatchWithObjectMethods(mlir::Location location, mlir_ts::FunctionType inFuncType, mlir_ts::FunctionType resFuncType,
                                                         unsigned startParamIn = 0, unsigned startParamRes = 0)
     {
         // 1 we need to skip opaque and objects
         if (startParamIn <= 0 && inFuncType.getNumInputs() > 0 &&
-            (inFuncType.getInput(0).isa<mlir_ts::OpaqueType>() || inFuncType.getInput(0).isa<mlir_ts::ObjectType>()))
+            (isa<mlir_ts::OpaqueType>(inFuncType.getInput(0)) || isa<mlir_ts::ObjectType>(inFuncType.getInput(0))))
         {
             startParamIn = 1;
         }
 
         if (startParamIn <= 1 && inFuncType.getNumInputs() > 1 &&
-            (inFuncType.getInput(1).isa<mlir_ts::OpaqueType>() || inFuncType.getInput(1).isa<mlir_ts::ObjectType>()))
+            (isa<mlir_ts::OpaqueType>(inFuncType.getInput(1)) || isa<mlir_ts::ObjectType>(inFuncType.getInput(1))))
         {
             startParamIn = 2;
         }
 
         if (startParamRes <= 0 && resFuncType.getNumInputs() > 0 &&
-            (resFuncType.getInput(0).isa<mlir_ts::OpaqueType>() || resFuncType.getInput(0).isa<mlir_ts::ObjectType>()))
+            (isa<mlir_ts::OpaqueType>(resFuncType.getInput(0)) || isa<mlir_ts::ObjectType>(resFuncType.getInput(0))))
         {
             startParamRes = 1;
         }
 
         if (startParamRes <= 1 && resFuncType.getNumInputs() > 1 &&
-            (resFuncType.getInput(1).isa<mlir_ts::OpaqueType>() || resFuncType.getInput(1).isa<mlir_ts::ObjectType>()))
+            (isa<mlir_ts::OpaqueType>(resFuncType.getInput(1)) || isa<mlir_ts::ObjectType>(resFuncType.getInput(1))))
         {
             startParamRes = 2;
         }
@@ -1052,16 +1161,9 @@ class MLIRTypeHelper
 
         for (unsigned i = 0, e = inFuncType.getInputs().size() - startParamIn; i != e; ++i)
         {
-            if (inFuncType.getInput(i + startParamIn) != resFuncType.getInput(i + startParamRes))
+            if (!canMatch(location, inFuncType.getInput(i + startParamIn), resFuncType.getInput(i + startParamRes)))
             {
-                /*
-                if (i == 0 && (inFuncType.getInput(i).isa<mlir_ts::OpaqueType>() || resFuncType.getInput(i).isa<mlir_ts::OpaqueType>()))
-                {
-                    // allow not to match opaque time at first position
-                    continue;
-                }
-                */
-
+                // allow certan unmatches such as object & unknown
                 return {MatchResultType::NotMatchArg, i};
             }
         }
@@ -1102,8 +1204,10 @@ class MLIRTypeHelper
 
             auto isInVoid = !inRetType || inRetType == noneType || inRetType == voidType;
             auto isResVoid = !resRetType || resRetType == noneType || resRetType == voidType;
-            if (!isInVoid && !isResVoid && inRetType != resRetType)
+            if (!isInVoid && !isResVoid && !canMatch(location, inRetType, resRetType))
             {
+                LLVM_DEBUG(llvm::dbgs() << "\n!! return types do not match [" << inRetType << "] and [" << resRetType << "]\n";);
+
                 return {MatchResultType::NotMatchResult, i};
             }
         }
@@ -1142,7 +1246,7 @@ class MLIRTypeHelper
                 return true;
             }
 
-            if (auto optType = type.dyn_cast<mlir_ts::OptionalType>())
+            if (auto optType = dyn_cast<mlir_ts::OptionalType>(type))
             {
                 return testType(optType.getElementType());
             }
@@ -1179,12 +1283,11 @@ class MLIRTypeHelper
         return true;
     }
 
-    mlir::LogicalResult canCastTupleToInterface(mlir_ts::TupleType tupleStorageType,
-                                                InterfaceInfo::TypePtr newInterfacePtr)
+    mlir::LogicalResult canCastTupleToInterface(mlir::Location location, mlir_ts::TupleType tupleStorageType,
+                                                InterfaceInfo::TypePtr newInterfacePtr, bool suppressErrors = false)
     {
         SmallVector<VirtualMethodOrFieldInfo> virtualTable;
-        auto location = mlir::UnknownLoc::get(context);
-        return getInterfaceVirtualTableForObject(location, tupleStorageType, newInterfacePtr, virtualTable, true);
+        return getInterfaceVirtualTableForObject(location, tupleStorageType, newInterfacePtr, virtualTable, suppressErrors);
     }
 
     mlir::LogicalResult getInterfaceVirtualTableForObject(mlir::Location location, mlir_ts::TupleType tupleStorageType,
@@ -1204,10 +1307,9 @@ class MLIRTypeHelper
                 if (foundIndex >= 0)
                 {
                     auto foundField = tupleStorageType.getFieldInfo(foundIndex);
-                    auto test = foundField.type.isa<mlir_ts::FunctionType>() && fieldType.isa<mlir_ts::FunctionType>()
-                                    ? TestFunctionTypesMatchWithObjectMethods(foundField.type, fieldType).result ==
-                                          MatchResultType::Match
-                                    : fieldType == foundField.type;
+                    auto test = isa<mlir_ts::FunctionType>(foundField.type) && isa<mlir_ts::FunctionType>(fieldType)
+                                    ? TestFunctionTypesMatchWithObjectMethods(location, foundField.type, fieldType).result == MatchResultType::Match
+                                    : stripLiteralType(fieldType) == stripLiteralType(foundField.type);
                     if (!test)
                     {
                         LLVM_DEBUG(llvm::dbgs() << "field " << id << " not matching type: " << fieldType << " and "
@@ -1227,12 +1329,12 @@ class MLIRTypeHelper
                     return foundField;
                 }
 
-                LLVM_DEBUG(llvm::dbgs() << "field can't be found " << id << " for interface '"
+                LLVM_DEBUG(llvm::dbgs() << id << " field can't be found for interface '"
                                     << newInterfacePtr->fullName << "' in object '" << tupleStorageType << "'";);
 
-                if (!isConditional)
+                if (!isConditional && !suppressErrors)
                 {
-                    emitError(location) << "field can't be found " << id << " for interface '"
+                    emitError(location)  << id << " field can't be found for interface '"
                                         << newInterfacePtr->fullName << "' in object '" << tupleStorageType << "'";
                 }
 
@@ -1246,7 +1348,7 @@ class MLIRTypeHelper
                 if (foundIndex >= 0)
                 {
                     auto foundField = tupleStorageType.getFieldInfo(foundIndex);
-                    auto test = foundField.type.isa<mlir_ts::FunctionType>()
+                    auto test = isa<mlir_ts::FunctionType>(foundField.type)
                                     ? TestFunctionTypesMatchWithObjectMethods(foundField.type, funcType).result ==
                                           MatchResultType::Match
                                     : funcType == foundField.type;
@@ -1268,7 +1370,7 @@ class MLIRTypeHelper
 
                     MethodInfo foundMethod{};
                     foundMethod.name = methodName;
-                    foundMethod.funcType = foundField.type.cast<mlir_ts::FunctionType>();
+                    foundMethod.funcType = cast<mlir_ts::FunctionType>(foundField.type);
                     // TODO: you need to load function from object
                     //foundMethod.funcOp
                     return foundMethod;
@@ -1279,7 +1381,7 @@ class MLIRTypeHelper
         return result;
     }
 
-    bool canCastFromTo(mlir::Type srcType, mlir::Type destType)
+    bool canCastFromTo(mlir::Location location, mlir::Type srcType, mlir::Type destType)
     {
         if (srcType == destType)
         {
@@ -1291,25 +1393,25 @@ class MLIRTypeHelper
             return true;
         }
 
-        if (auto constTuple = srcType.dyn_cast<mlir_ts::ConstTupleType>())
+        if (auto constTuple = dyn_cast<mlir_ts::ConstTupleType>(srcType))
         {
-            if (auto matchConstTuple = destType.dyn_cast<mlir_ts::ConstTupleType>())
+            if (auto matchConstTuple = dyn_cast<mlir_ts::ConstTupleType>(destType))
             {
                 return canCastFromToLogic(constTuple, matchConstTuple);
             }
 
-            if (auto matchTuple = destType.dyn_cast<mlir_ts::TupleType>())
+            if (auto matchTuple = dyn_cast<mlir_ts::TupleType>(destType))
             {
                 return canCastFromToLogic(constTuple, matchTuple);
             }
 
-            if (auto ifaceType = destType.dyn_cast<mlir_ts::InterfaceType>())
+            if (auto ifaceType = dyn_cast<mlir_ts::InterfaceType>(destType))
             {
                 if (getInterfaceInfoByFullName)
                 {
                     if (auto ifaceTypeInfo = getInterfaceInfoByFullName(ifaceType.getName().getValue()))
                     {
-                        return mlir::succeeded(canCastTupleToInterface(convertConstTupleTypeToTupleType(constTuple), ifaceTypeInfo));
+                        return mlir::succeeded(canCastTupleToInterface(location, convertConstTupleTypeToTupleType(constTuple), ifaceTypeInfo));
                     }
                     else
                     {
@@ -1324,20 +1426,20 @@ class MLIRTypeHelper
             }
         }
 
-        if (auto tuple = srcType.dyn_cast<mlir_ts::TupleType>())
+        if (auto tuple = dyn_cast<mlir_ts::TupleType>(srcType))
         {
-            if (auto matchTuple = destType.dyn_cast<mlir_ts::TupleType>())
+            if (auto matchTuple = dyn_cast<mlir_ts::TupleType>(destType))
             {
                 return canCastFromToLogic(tuple, matchTuple);
             }
 
-            if (auto ifaceType = destType.dyn_cast<mlir_ts::InterfaceType>())
+            if (auto ifaceType = dyn_cast<mlir_ts::InterfaceType>(destType))
             {
                 if (getInterfaceInfoByFullName)
                 {
                     if (auto ifaceTypeInfo = getInterfaceInfoByFullName(ifaceType.getName().getValue()))
                     {
-                        return mlir::succeeded(canCastTupleToInterface(tuple, ifaceTypeInfo));
+                        return mlir::succeeded(canCastTupleToInterface(location, tuple, ifaceTypeInfo));
                     }
                     else
                     {
@@ -1356,7 +1458,7 @@ class MLIRTypeHelper
         {
             auto srcTypeUnwrapped = stripOptionalType(srcType);
             auto destTypeUnwrapped = stripOptionalType(destType);
-            if (!srcTypeUnwrapped.isa<mlir_ts::FunctionType>() && destTypeUnwrapped.isa<mlir_ts::FunctionType>())
+            if (!isa<mlir_ts::FunctionType>(srcTypeUnwrapped) && isa<mlir_ts::FunctionType>(destTypeUnwrapped))
             {
                 // because of data loss we need to return false;
                 return false;
@@ -1371,10 +1473,10 @@ class MLIRTypeHelper
             return TestFunctionTypesMatch(srcInputs, destInputs, srcResults, destResults, srcIsVarArg, destIsVarArg).result == MatchResultType::Match;
         }
 
-        if (auto unionType = destType.dyn_cast<mlir_ts::UnionType>())
+        if (auto unionType = dyn_cast<mlir_ts::UnionType>(destType))
         {
             // calculate store size
-            auto pred = [&](auto &item) { return canCastFromTo(item, srcType); };
+            auto pred = [&](auto &item) { return canCastFromTo(location, item, srcType); };
             auto types = unionType.getTypes();
             if (std::find_if(types.begin(), types.end(), pred) == types.end())
             {
@@ -1397,7 +1499,7 @@ class MLIRTypeHelper
                 return true;
             }
 
-            if (auto optType = type.dyn_cast<mlir_ts::OptionalType>())
+            if (auto optType = dyn_cast<mlir_ts::OptionalType>(type))
             {
                 return testType(optType.getElementType());
             }
@@ -1410,12 +1512,12 @@ class MLIRTypeHelper
 
     bool hasUndefines(mlir::Type type)
     {
-        if (auto constTuple = type.dyn_cast<mlir_ts::ConstTupleType>())
+        if (auto constTuple = dyn_cast<mlir_ts::ConstTupleType>(type))
         {
             return hasUndefinesLogic(constTuple);
         }
 
-        if (auto tuple = type.dyn_cast<mlir_ts::TupleType>())
+        if (auto tuple = dyn_cast<mlir_ts::TupleType>(type))
         {
             return hasUndefinesLogic(tuple);
         }
@@ -1426,8 +1528,8 @@ class MLIRTypeHelper
     mlir::Type mergeIntTypes(mlir::Type typeLeft, mlir::Type typeRight, bool& found)
     {
         found = false;
-        auto intTypeLeft = typeLeft.dyn_cast<mlir::IntegerType>();
-        auto intTypeRight = typeRight.dyn_cast<mlir::IntegerType>();
+        auto intTypeLeft = dyn_cast<mlir::IntegerType>(typeLeft);
+        auto intTypeRight = dyn_cast<mlir::IntegerType>(typeRight);
         if (intTypeLeft && intTypeRight)
         {
             auto width = std::max(intTypeLeft.getIntOrFloatBitWidth(), intTypeRight.getIntOrFloatBitWidth());
@@ -1513,38 +1615,38 @@ class MLIRTypeHelper
             return true;
         }
 
-        if (srcType.isa<mlir::IntegerType>())
+        if (isa<mlir::IntegerType>(srcType))
         {
-            if (dstType.isa<mlir_ts::NumberType>())
+            if (isa<mlir_ts::NumberType>(dstType))
             {
                 return true;
             }
         }
 
         // we should not treat boolean as integer
-        // if (srcType.isa<mlir_ts::BooleanType>())
+        // if (isa<mlir_ts::BooleanType>(srcType))
         // {
-        //     if (dstType.isa<mlir::IntegerType>() && dstType.getIntOrFloatBitWidth() > 0)
+        //     if (isa<mlir::IntegerType>(dstType) && dstType.getIntOrFloatBitWidth() > 0)
         //     {
         //         return true;
         //     }
 
-        //     if (dstType.isa<mlir_ts::NumberType>())
+        //     if (isa<mlir_ts::NumberType>(dstType))
         //     {
         //         return true;
         //     }
         // }
 
         // but we can't cast TypePredicate to boolean as we will lose the information about type
-        if (srcType.isa<mlir_ts::BooleanType>())
+        if (isa<mlir_ts::BooleanType>(srcType))
         {
-            if (dstType.isa<mlir_ts::TypePredicateType>())
+            if (isa<mlir_ts::TypePredicateType>(dstType))
             {
                 return true;
             }
         }        
 
-        if (auto dstEnumType = dstType.dyn_cast<mlir_ts::EnumType>())
+        if (auto dstEnumType = dyn_cast<mlir_ts::EnumType>(dstType))
         {
             if (dstEnumType.getElementType() == srcType)
             {
@@ -1552,25 +1654,25 @@ class MLIRTypeHelper
             }
         }          
 
-        if (auto literalType = srcType.dyn_cast<mlir_ts::LiteralType>())
+        if (auto literalType = dyn_cast<mlir_ts::LiteralType>(srcType))
         {
             return canWideTypeWithoutDataLoss(literalType.getElementType(), dstType);
         }
 
-        if (auto enumType = srcType.dyn_cast<mlir_ts::EnumType>())
+        if (auto enumType = dyn_cast<mlir_ts::EnumType>(srcType))
         {
             return canWideTypeWithoutDataLoss(enumType.getElementType(), dstType);
         }        
 
         // wide range type can't be stored into literal
-        if (auto optionalType = dstType.dyn_cast<mlir_ts::OptionalType>())
+        if (auto optionalType = dyn_cast<mlir_ts::OptionalType>(dstType))
         {
-            if (auto srcOptionalType = srcType.dyn_cast<mlir_ts::OptionalType>())
+            if (auto srcOptionalType = dyn_cast<mlir_ts::OptionalType>(srcType))
             {
                 return canWideTypeWithoutDataLoss(srcOptionalType.getElementType(), optionalType.getElementType());
             }
 
-            if (auto undefType = srcType.dyn_cast<mlir_ts::UndefinedType>())
+            if (auto undefType = dyn_cast<mlir_ts::UndefinedType>(srcType))
             {
                 return true;
             }
@@ -1578,9 +1680,9 @@ class MLIRTypeHelper
             return canWideTypeWithoutDataLoss(srcType, optionalType.getElementType());
         }
 
-        if (auto arrayType = dstType.dyn_cast<mlir_ts::ArrayType>())
+        if (auto arrayType = dyn_cast<mlir_ts::ArrayType>(dstType))
         {
-            if (auto constArrayType = srcType.dyn_cast<mlir_ts::ConstArrayType>())
+            if (auto constArrayType = dyn_cast<mlir_ts::ConstArrayType>(srcType))
             {
                 if (constArrayType.getSize() == 0)
                 {
@@ -1592,9 +1694,9 @@ class MLIRTypeHelper
         }        
 
         // native types
-        if (auto destIntType = dstType.dyn_cast<mlir::IntegerType>())
+        if (auto destIntType = dyn_cast<mlir::IntegerType>(dstType))
         {
-            if (auto srcIntType = srcType.dyn_cast<mlir::IntegerType>())
+            if (auto srcIntType = dyn_cast<mlir::IntegerType>(srcType))
             {
                 if ((srcIntType.getSignedness() == destIntType.getSignedness() || srcIntType.isSignless() || destIntType.isSignless())
                     && srcIntType.getIntOrFloatBitWidth() <= destIntType.getIntOrFloatBitWidth())
@@ -1617,9 +1719,9 @@ class MLIRTypeHelper
             }    
         }          
 
-        if (auto destFloatType = dstType.dyn_cast<mlir::FloatType>())
+        if (auto destFloatType = dyn_cast<mlir::FloatType>(dstType))
         {
-            if (auto srcFloatType = srcType.dyn_cast<mlir::FloatType>())
+            if (auto srcFloatType = dyn_cast<mlir::FloatType>(srcType))
             {
                 if (srcFloatType.getIntOrFloatBitWidth() <= destFloatType.getIntOrFloatBitWidth())
                 {
@@ -1627,7 +1729,7 @@ class MLIRTypeHelper
                 }
             }
 
-            if (auto srcIntType = srcType.dyn_cast<mlir::IntegerType>())
+            if (auto srcIntType = dyn_cast<mlir::IntegerType>(srcType))
             {
                 return true;
             }            
@@ -1653,22 +1755,22 @@ class MLIRTypeHelper
             return true;
         }
 
-        if (auto constTuple = srcType.dyn_cast<mlir_ts::ConstTupleType>())
+        if (auto constTuple = dyn_cast<mlir_ts::ConstTupleType>(srcType))
         {
-            if (auto matchConstTuple = dstType.dyn_cast<mlir_ts::ConstTupleType>())
+            if (auto matchConstTuple = dyn_cast<mlir_ts::ConstTupleType>(dstType))
             {
                 return isSizeEqualLogic(constTuple, matchConstTuple);
             }
 
-            if (auto matchTuple = dstType.dyn_cast<mlir_ts::TupleType>())
+            if (auto matchTuple = dyn_cast<mlir_ts::TupleType>(dstType))
             {
                 return isSizeEqualLogic(constTuple, matchTuple);
             }
         }
 
-        if (auto tuple = srcType.dyn_cast<mlir_ts::TupleType>())
+        if (auto tuple = dyn_cast<mlir_ts::TupleType>(srcType))
         {
-            if (auto matchTuple = dstType.dyn_cast<mlir_ts::TupleType>())
+            if (auto matchTuple = dyn_cast<mlir_ts::TupleType>(dstType))
             {
                 return isSizeEqualLogic(tuple, matchTuple);
             }
@@ -1682,12 +1784,12 @@ class MLIRTypeHelper
     // TODO: obsolete, review usage (use stripLiteralType etc)
     mlir::Type getBaseType(mlir::Type type)
     {
-        if (auto literalType = type.dyn_cast<mlir_ts::LiteralType>())
+        if (auto literalType = dyn_cast<mlir_ts::LiteralType>(type))
         {
             return literalType.getElementType();
         }
 
-        if (auto enumType = type.dyn_cast<mlir_ts::EnumType>())
+        if (auto enumType = dyn_cast<mlir_ts::EnumType>(type))
         {
             return enumType.getElementType();
         }
@@ -1695,29 +1797,29 @@ class MLIRTypeHelper
         return type;
     }
 
-    bool isUnionTypeNeedsTag(mlir_ts::UnionType unionType)
+    bool isUnionTypeNeedsTag(mlir::Location location, mlir_ts::UnionType unionType)
     {
         mlir::Type baseType;
-        return isUnionTypeNeedsTag(unionType, baseType);
+        return isUnionTypeNeedsTag(location, unionType, baseType);
     }
 
-    bool isUnionTypeNeedsTag(mlir_ts::UnionType unionType, mlir::Type &baseType)
+    bool isUnionTypeNeedsTag(mlir::Location location, mlir_ts::UnionType unionType, mlir::Type &baseType)
     {
-        auto storeType = getUnionTypeWithMerge(unionType.getTypes(), true);
+        auto storeType = getUnionTypeWithMerge(location, unionType.getTypes(), true);
         baseType = storeType;
-        return storeType.isa<mlir_ts::UnionType>();
+        return isa<mlir_ts::UnionType>(storeType);
     }
 
-    ExtendsResult appendInferTypeToContext(mlir::Type srcType, mlir_ts::InferType inferType, llvm::StringMap<std::pair<ts::TypeParameterDOM::TypePtr,mlir::Type>> &typeParamsWithArgs, bool useTupleType = false)
+    ExtendsResult appendInferTypeToContext(mlir::Location location, mlir::Type srcType, mlir_ts::InferType inferType, llvm::StringMap<std::pair<ts::TypeParameterDOM::TypePtr,mlir::Type>> &typeParamsWithArgs, bool useTupleType = false)
     {
-        auto name = inferType.getElementType().cast<mlir_ts::NamedGenericType>().getName().getValue();
+        auto name = cast<mlir_ts::NamedGenericType>(inferType.getElementType()).getName().getValue();
         auto currentType = srcType;
 
         auto existType = typeParamsWithArgs.lookup(name);
         if (existType.second)
         {
-            auto namedType = existType.second.dyn_cast<mlir_ts::NamedGenericType>();
-            if (namedType && namedType.getName().getValue().equals(name))
+            auto namedType = dyn_cast<mlir_ts::NamedGenericType>(existType.second);
+            if (namedType && namedType.getName().getValue().compare(name) == 0)
             {
                 // replace generic type
                 typeParamsWithArgs[name].second = currentType;
@@ -1728,7 +1830,7 @@ class MLIRTypeHelper
                 {
                     SmallVector<mlir_ts::FieldInfo> fieldInfos;
 
-                    if (auto tupleType = existType.second.dyn_cast<mlir_ts::TupleType>())
+                    if (auto tupleType = dyn_cast<mlir_ts::TupleType>(existType.second))
                     {
                         for (auto param : tupleType.getFields())
                         {
@@ -1746,7 +1848,7 @@ class MLIRTypeHelper
                 }
                 else
                 {
-                    auto defaultUnionType = getUnionType(existType.second, currentType);
+                    auto defaultUnionType = getUnionType(location, existType.second, currentType);
 
                     LLVM_DEBUG(llvm::dbgs() << "\n!! existing type: " << existType.second << " default type: " << defaultUnionType
                                             << "\n";);
@@ -1778,22 +1880,22 @@ class MLIRTypeHelper
             return mlir_ts::UnknownType::get(context);
         }
 
-        if (attr.isa<mlir::StringAttr>())
+        if (isa<mlir::StringAttr>(attr))
         {
             return mlir_ts::StringType::get(context);
         }
 
-        if (attr.isa<mlir::FloatAttr>())
+        if (isa<mlir::FloatAttr>(attr))
         {
             return mlir_ts::NumberType::get(context);
         }
 
-        if (attr.isa<mlir::IntegerAttr>())
+        if (isa<mlir::IntegerAttr>(attr))
         {
             return mlir_ts::NumberType::get(context);
         }
 
-        if (auto typedAttr = attr.dyn_cast<mlir::TypedAttr>())
+        if (auto typedAttr = dyn_cast<mlir::TypedAttr>(attr))
         {
             return typedAttr.getType();
         }
@@ -1812,7 +1914,7 @@ class MLIRTypeHelper
         SmallVector<mlir::Type> literalTypes;
         for (auto field : destTupleFields)
         {
-            auto litType = field.id && field.id.isa<mlir::StringAttr>() 
+            auto litType = field.id && isa<mlir::StringAttr>(field.id) 
                 ? mlir_ts::LiteralType::get(field.id, mlir_ts::StringType::get(context))
                 : getAttributeType(field.id);
             literalTypes.push_back(litType);
@@ -1841,7 +1943,7 @@ class MLIRTypeHelper
 
         for (auto field : destTupleFields)
         {
-            auto litType = field.id && field.id.isa<mlir::StringAttr>() 
+            auto litType = field.id && isa<mlir::StringAttr>(field.id) 
                 ? mlir_ts::LiteralType::get(field.id, mlir_ts::StringType::get(context))
                 : getAttributeType(field.id);
             if (litType == index)
@@ -1860,7 +1962,7 @@ class MLIRTypeHelper
             return mlir::failure();
         }
 
-        if (auto constTupleType = srcType.dyn_cast<mlir_ts::ConstTupleType>())
+        if (auto constTupleType = dyn_cast<mlir_ts::ConstTupleType>(srcType))
         {
             for (auto &fieldInfo : constTupleType.getFields())
             {
@@ -1869,7 +1971,7 @@ class MLIRTypeHelper
 
             return mlir::success();
         }          
-        else if (auto tupleType = srcType.dyn_cast<mlir_ts::TupleType>())
+        else if (auto tupleType = dyn_cast<mlir_ts::TupleType>(srcType))
         {
             for (auto &fieldInfo : tupleType.getFields())
             {
@@ -1878,7 +1980,7 @@ class MLIRTypeHelper
 
             return mlir::success();
         }         
-        else if (auto srcInterfaceType = srcType.dyn_cast<mlir_ts::InterfaceType>())
+        else if (auto srcInterfaceType = dyn_cast<mlir_ts::InterfaceType>(srcType))
         {
             if (getInterfaceInfoByFullName)
             {
@@ -1893,16 +1995,16 @@ class MLIRTypeHelper
 
             return mlir::failure();
         } 
-        else if (auto srcClassType = srcType.dyn_cast<mlir_ts::ClassType>())
+        else if (auto srcClassType = dyn_cast<mlir_ts::ClassType>(srcType))
         {
-            for (auto &fieldInfo : srcClassType.getStorageType().cast<mlir_ts::ClassStorageType>().getFields())
+            for (auto &fieldInfo : cast<mlir_ts::ClassStorageType>(srcClassType.getStorageType()).getFields())
             {
                 destTupleFields.push_back(fieldInfo);
             }       
             
             return mlir::success();         
         }         
-        else if (auto srcClassStorageType = srcType.dyn_cast<mlir_ts::ClassStorageType>())
+        else if (auto srcClassStorageType = dyn_cast<mlir_ts::ClassStorageType>(srcType))
         {
             for (auto &fieldInfo : srcClassStorageType.getFields())
             {
@@ -1911,7 +2013,7 @@ class MLIRTypeHelper
             
             return mlir::success();            
         }
-        else if (srcType.dyn_cast<mlir_ts::ArrayType>() || srcType.dyn_cast<mlir_ts::ConstArrayType>() || srcType.dyn_cast<mlir_ts::StringType>())
+        else if (isa<mlir_ts::ArrayType>(srcType) || isa<mlir_ts::ConstArrayType>(srcType) || isa<mlir_ts::StringType>(srcType))
         {
             // TODO: do not break the order as it is used in Debug info
             destTupleFields.push_back({ mlir::Attribute(), mlir_ts::NumberType::get(context), false });
@@ -1919,7 +2021,7 @@ class MLIRTypeHelper
             //destTupleFields.push_back({ MLIRHelper::TupleFieldName(INDEX_ACCESS_FIELD_NAME, context), mlir_ts::NumberType::get(context), false });
             return mlir::success();
         }
-        else if (auto optType = srcType.dyn_cast<mlir_ts::OptionalType>())
+        else if (auto optType = dyn_cast<mlir_ts::OptionalType>(srcType))
         {
             // TODO: do not break the order as it is used in Debug info
             destTupleFields.push_back({ MLIRHelper::TupleFieldName("value", context), optType.getElementType(), false });
@@ -1956,7 +2058,7 @@ class MLIRTypeHelper
     {
         LLVM_DEBUG(llvm::dbgs() << "!! get type of field '" << fieldName << "' of '" << srcType << "'\n";);
 
-        if (auto constTupleType = srcType.dyn_cast<mlir_ts::ConstTupleType>())
+        if (auto constTupleType = dyn_cast<mlir_ts::ConstTupleType>(srcType))
         {
             auto index = constTupleType.getIndex(fieldName);
             if (index < 0)
@@ -1967,7 +2069,7 @@ class MLIRTypeHelper
             return constTupleType.getFieldInfo(index).type;
         }          
         
-        if (auto tupleType = srcType.dyn_cast<mlir_ts::TupleType>())
+        if (auto tupleType = dyn_cast<mlir_ts::TupleType>(srcType))
         {
             auto index = tupleType.getIndex(fieldName);
             if (index < 0)
@@ -1978,7 +2080,7 @@ class MLIRTypeHelper
             return tupleType.getFieldInfo(index).type;
         }  
 
-        if (auto srcInterfaceType = srcType.dyn_cast<mlir_ts::InterfaceType>())
+        if (auto srcInterfaceType = dyn_cast<mlir_ts::InterfaceType>(srcType))
         {
             if (auto srcInterfaceInfo = getInterfaceInfoByFullName(srcInterfaceType.getName().getValue()))
             {
@@ -1989,7 +2091,7 @@ class MLIRTypeHelper
                     return fieldInfo->type;
                 }
 
-                if (auto strName = fieldName.dyn_cast<mlir::StringAttr>())
+                if (auto strName = dyn_cast<mlir::StringAttr>(fieldName))
                 {
                     auto methodInfo = srcInterfaceInfo->findMethod(strName, totalOffset);
                     if (methodInfo)
@@ -2006,7 +2108,7 @@ class MLIRTypeHelper
             return mlir::Type();
         }
 
-        if (auto srcClassType = srcType.dyn_cast<mlir_ts::ClassType>())
+        if (auto srcClassType = dyn_cast<mlir_ts::ClassType>(srcType))
         {
             if (auto srcClassInfo = getInterfaceInfoByFullName(srcClassType.getName().getValue()))
             {
@@ -2017,7 +2119,7 @@ class MLIRTypeHelper
                     return fieldInfo->type;
                 }
 
-                if (auto strName = fieldName.dyn_cast<mlir::StringAttr>())
+                if (auto strName = dyn_cast<mlir::StringAttr>(fieldName))
                 {
                     auto methodInfo = srcClassInfo->findMethod(strName, totalOffset);
                     if (methodInfo)
@@ -2036,7 +2138,7 @@ class MLIRTypeHelper
 
         // TODO: read fields info from class Array
         // TODO: sync it with getFields
-        if (auto arrayType = srcType.dyn_cast<mlir_ts::ArrayType>())
+        if (auto arrayType = dyn_cast<mlir_ts::ArrayType>(srcType))
         {
             if (fieldName == MLIRHelper::TupleFieldName(LENGTH_FIELD_NAME, context))
             {
@@ -2052,7 +2154,7 @@ class MLIRTypeHelper
         }        
 
         // TODO: read fields info from class Array
-        if (auto constArrayType = srcType.dyn_cast<mlir_ts::ConstArrayType>())
+        if (auto constArrayType = dyn_cast<mlir_ts::ConstArrayType>(srcType))
         {
             if (fieldName == MLIRHelper::TupleFieldName(LENGTH_FIELD_NAME, context))
             {
@@ -2068,7 +2170,7 @@ class MLIRTypeHelper
         }        
 
         // TODO: read data from String class
-        if (auto stringType = srcType.dyn_cast<mlir_ts::StringType>())
+        if (auto stringType = dyn_cast<mlir_ts::StringType>(srcType))
         {
             if (fieldName == MLIRHelper::TupleFieldName(LENGTH_FIELD_NAME, context))
             {
@@ -2083,7 +2185,7 @@ class MLIRTypeHelper
             llvm_unreachable("not implemented");
         }        
 
-        if (auto unionType = srcType.dyn_cast<mlir_ts::UnionType>())
+        if (auto unionType = dyn_cast<mlir_ts::UnionType>(srcType))
         {
             llvm::SmallVector<mlir::Type> types;
             for (auto &item : unionType.getTypes())
@@ -2095,20 +2197,20 @@ class MLIRTypeHelper
             return mlir_ts::UnionType::get(context, types);
         }        
 
-        if (auto namedGenericType = srcType.dyn_cast<mlir_ts::NamedGenericType>())
+        if (auto namedGenericType = dyn_cast<mlir_ts::NamedGenericType>(srcType))
         {
-            auto typedAttr = fieldName.dyn_cast<mlir::TypedAttr>();
+            auto typedAttr = dyn_cast<mlir::TypedAttr>(fieldName);
             // TODO: make common function
             auto fieldNameLiteralType = mlir_ts::LiteralType::get(fieldName, typedAttr && !isNoneType(typedAttr.getType()) ? typedAttr.getType() : mlir_ts::StringType::get(context));
             return mlir_ts::IndexAccessType::get(srcType, fieldNameLiteralType);
         }
 
-        if (auto anyType = srcType.dyn_cast<mlir_ts::AnyType>())
+        if (auto anyType = dyn_cast<mlir_ts::AnyType>(srcType))
         {
             return anyType;
         }        
 
-        if (auto unknownType = srcType.dyn_cast<mlir_ts::UnknownType>())
+        if (auto unknownType = dyn_cast<mlir_ts::UnknownType>(srcType))
         {
             // TODO: but in index type it should return "any"
             return mlir::Type();
@@ -2117,7 +2219,7 @@ class MLIRTypeHelper
         llvm_unreachable("not implemented");
     }
 
-    ExtendsResult extendsTypeFuncTypes(mlir::Type srcType, mlir::Type extendType,
+    ExtendsResult extendsTypeFuncTypes(mlir::Location location, mlir::Type srcType, mlir::Type extendType,
         llvm::StringMap<std::pair<ts::TypeParameterDOM::TypePtr,mlir::Type>> &typeParamsWithArgs, int skipSrcParams = 0)
     {
             auto srcParams = getParamsFromFuncRef(srcType);
@@ -2129,10 +2231,10 @@ class MLIRTypeHelper
             auto srcReturnType = getReturnTypeFromFuncRef(srcType);
             auto extReturnType = getReturnTypeFromFuncRef(extendType);       
 
-            return extendsTypeFuncTypes(srcParams, extParams, extIsVarArgs, srcReturnType, extReturnType, typeParamsWithArgs, skipSrcParams);    
+            return extendsTypeFuncTypes(location, srcParams, extParams, extIsVarArgs, srcReturnType, extReturnType, typeParamsWithArgs, skipSrcParams);    
     }
 
-    ExtendsResult extendsTypeFuncTypes(ArrayRef<mlir::Type> srcParams, ArrayRef<mlir::Type> extParams, bool extIsVarArgs, 
+    ExtendsResult extendsTypeFuncTypes(mlir::Location location, ArrayRef<mlir::Type> srcParams, ArrayRef<mlir::Type> extParams, bool extIsVarArgs, 
         mlir::Type srcReturnType, mlir::Type extReturnType,
         llvm::StringMap<std::pair<ts::TypeParameterDOM::TypePtr,mlir::Type>> &typeParamsWithArgs, int skipSrcParams = 0)
     {
@@ -2149,7 +2251,7 @@ class MLIRTypeHelper
             auto isIndexAtExtVarArgs = extIsVarArgs && index >= extParams.size() - 1;
 
             auto useTupleWhenMergeTypes = isIndexAtExtVarArgs;
-            if (auto inferType = extParamType.dyn_cast<mlir_ts::InferType>())
+            if (auto inferType = dyn_cast<mlir_ts::InferType>(extParamType))
             {
                 useTupleWhenMergeTypes = true;
                 if (isIndexAtExtVarArgs && !srcParamType)
@@ -2162,13 +2264,13 @@ class MLIRTypeHelper
 
             if (isIndexAtExtVarArgs)
             {
-                if (auto arrayType = extParamType.dyn_cast<mlir_ts::ArrayType>())
+                if (auto arrayType = dyn_cast<mlir_ts::ArrayType>(extParamType))
                 {
                     extParamType = arrayType.getElementType();
                 }
             }
 
-            auto extendsResult = extendsType(srcParamType, extParamType, typeParamsWithArgs, useTupleWhenMergeTypes);
+            auto extendsResult = extendsType(location, srcParamType, extParamType, typeParamsWithArgs, useTupleWhenMergeTypes);
             if (extendsResult != ExtendsResult::True)
             {
                 return extendsResult;
@@ -2176,11 +2278,11 @@ class MLIRTypeHelper
         }      
 
         // compare return types
-        return extendsType(srcReturnType, extReturnType, typeParamsWithArgs);
+        return extendsType(location, srcReturnType, extReturnType, typeParamsWithArgs);
 
     }
 
-    ExtendsResult extendsType(mlir::Type srcType, mlir::Type extendType, llvm::StringMap<std::pair<ts::TypeParameterDOM::TypePtr,mlir::Type>> &typeParamsWithArgs, bool useTupleWhenMergeTypes = false)
+    ExtendsResult extendsType(mlir::Location location, mlir::Type srcType, mlir::Type extendType, llvm::StringMap<std::pair<ts::TypeParameterDOM::TypePtr,mlir::Type>> &typeParamsWithArgs, bool useTupleWhenMergeTypes = false)
     {
         LLVM_DEBUG(llvm::dbgs() << "\n!! is extending type: [ " << srcType << " ] extend type: [ " << extendType
                                 << " ]\n";);        
@@ -2195,41 +2297,41 @@ class MLIRTypeHelper
             return ExtendsResult::True;
         }
 
-        if (auto neverType = extendType.dyn_cast<mlir_ts::NeverType>())
+        if (auto neverType = dyn_cast<mlir_ts::NeverType>(extendType))
         {
             return ExtendsResult::False;
         }        
 
-        if (auto unknownType = extendType.dyn_cast<mlir_ts::UnknownType>())
+        if (auto unknownType = dyn_cast<mlir_ts::UnknownType>(extendType))
         {
             return ExtendsResult::True;
         }
 
-        if (auto anyType = extendType.dyn_cast<mlir_ts::AnyType>())
+        if (auto anyType = dyn_cast<mlir_ts::AnyType>(extendType))
         {
             return ExtendsResult::True;
         }
 
-        if (auto anyType = srcType.dyn_cast_or_null<mlir_ts::AnyType>())
+        if (auto anyType = dyn_cast_or_null<mlir_ts::AnyType>(srcType))
         {
             SmallVector<mlir_ts::InferType> inferTypes;
             getAllInferTypes(extendType, inferTypes);
             for (auto inferType : inferTypes)
             {
-                appendInferTypeToContext(mlir_ts::UnknownType::get(context), inferType, typeParamsWithArgs, useTupleWhenMergeTypes);
+                appendInferTypeToContext(location, mlir_ts::UnknownType::get(context), inferType, typeParamsWithArgs, useTupleWhenMergeTypes);
             }
 
             // TODO: add all infer types in extends to "unknown"
             return ExtendsResult::Any;
         }        
 
-        if (auto neverType = srcType.dyn_cast_or_null<mlir_ts::NeverType>())
+        if (auto neverType = dyn_cast_or_null<mlir_ts::NeverType>(srcType))
         {
             SmallVector<mlir_ts::InferType> inferTypes;
             getAllInferTypes(extendType, inferTypes);
             for (auto inferType : inferTypes)
             {
-                appendInferTypeToContext(mlir_ts::NeverType::get(context), inferType, typeParamsWithArgs, useTupleWhenMergeTypes);
+                appendInferTypeToContext(location, mlir_ts::NeverType::get(context), inferType, typeParamsWithArgs, useTupleWhenMergeTypes);
             }
 
             // TODO: add all infer types in extends to "never"
@@ -2237,9 +2339,9 @@ class MLIRTypeHelper
         }        
 
         // to support infer types
-        if (auto inferType = extendType.dyn_cast<mlir_ts::InferType>())
+        if (auto inferType = dyn_cast<mlir_ts::InferType>(extendType))
         {
-            return appendInferTypeToContext(srcType, inferType, typeParamsWithArgs, useTupleWhenMergeTypes);
+            return appendInferTypeToContext(location, srcType, inferType, typeParamsWithArgs, useTupleWhenMergeTypes);
         }
 
         if (!srcType)
@@ -2247,11 +2349,11 @@ class MLIRTypeHelper
             return ExtendsResult::False;
         }        
 
-        if (auto unionType = extendType.dyn_cast<mlir_ts::UnionType>())
+        if (auto unionType = dyn_cast<mlir_ts::UnionType>(extendType))
         {
             auto falseResult = ExtendsResult::False;
             auto pred = [&](auto &item) { 
-                auto unionExtResult = extendsType(srcType, item, typeParamsWithArgs);
+                auto unionExtResult = extendsType(location, srcType, item, typeParamsWithArgs);
                 if (unionExtResult == ExtendsResult::Never)
                 {
                     falseResult = unionExtResult;
@@ -2263,14 +2365,14 @@ class MLIRTypeHelper
             return std::find_if(types.begin(), types.end(), pred) != types.end() ? ExtendsResult::True : falseResult;
         }
 
-        if (auto tupleType = extendType.dyn_cast<mlir_ts::TupleType>())
+        if (auto tupleType = dyn_cast<mlir_ts::TupleType>(extendType))
         {
             auto falseResult = ExtendsResult::False;
             auto pred = [&](auto &item) { 
                 if (item.id)
                 {
                     auto fieldType = getFieldTypeByFieldName(srcType, item.id);
-                    auto fieldExtResult = extendsType(fieldType, item.type, typeParamsWithArgs);
+                    auto fieldExtResult = extendsType(location, fieldType, item.type, typeParamsWithArgs);
                     if (fieldExtResult == ExtendsResult::Never)
                     {
                         falseResult = fieldExtResult;
@@ -2287,14 +2389,14 @@ class MLIRTypeHelper
             return std::all_of(tupleType.getFields().begin(), tupleType.getFields().end(), pred) ? ExtendsResult::True : falseResult;
         }
 
-        if (auto constTupleType = extendType.dyn_cast<mlir_ts::ConstTupleType>())
+        if (auto constTupleType = dyn_cast<mlir_ts::ConstTupleType>(extendType))
         {
             auto falseResult = ExtendsResult::False;
             auto pred = [&](auto &item) { 
                 if (item.id)
                 {
                     auto fieldType = getFieldTypeByFieldName(srcType, item.id);
-                    auto fieldExtResult = extendsType(fieldType, item.type, typeParamsWithArgs);
+                    auto fieldExtResult = extendsType(location, fieldType, item.type, typeParamsWithArgs);
                     if (fieldExtResult == ExtendsResult::Never)
                     {
                         falseResult = fieldExtResult;
@@ -2311,43 +2413,43 @@ class MLIRTypeHelper
             return std::all_of(constTupleType.getFields().begin(), constTupleType.getFields().end(), pred) ? ExtendsResult::True : falseResult;
         }
 
-        if (auto literalType = srcType.dyn_cast<mlir_ts::LiteralType>())
+        if (auto literalType = dyn_cast<mlir_ts::LiteralType>(srcType))
         {
-            if (auto litExt = extendType.dyn_cast<mlir_ts::LiteralType>())
+            if (auto litExt = dyn_cast<mlir_ts::LiteralType>(extendType))
             {
                 return ExtendsResult::False;
             }
 
-            return extendsType(literalType.getElementType(), extendType, typeParamsWithArgs);
+            return extendsType(location, literalType.getElementType(), extendType, typeParamsWithArgs);
         }
 
-        if (auto srcArray = srcType.dyn_cast<mlir_ts::ArrayType>())
+        if (auto srcArray = dyn_cast<mlir_ts::ArrayType>(srcType))
         {
-            if (auto extArray = extendType.dyn_cast<mlir_ts::ArrayType>())
+            if (auto extArray = dyn_cast<mlir_ts::ArrayType>(extendType))
             {
-                return extendsType(srcArray.getElementType(), extArray.getElementType(), typeParamsWithArgs);
+                return extendsType(location, srcArray.getElementType(), extArray.getElementType(), typeParamsWithArgs);
             }
         }
 
-        if (auto srcArray = srcType.dyn_cast<mlir_ts::ConstArrayType>())
+        if (auto srcArray = dyn_cast<mlir_ts::ConstArrayType>(srcType))
         {
-            if (auto extArray = extendType.dyn_cast<mlir_ts::ArrayType>())
+            if (auto extArray = dyn_cast<mlir_ts::ArrayType>(extendType))
             {
-                return extendsType(srcArray.getElementType(), extArray.getElementType(), typeParamsWithArgs);
+                return extendsType(location, srcArray.getElementType(), extArray.getElementType(), typeParamsWithArgs);
             }
         }
 
         // Special case when we have string type (widen from Literal Type)
-        if (auto literalType = extendType.dyn_cast<mlir_ts::LiteralType>())
+        if (auto literalType = dyn_cast<mlir_ts::LiteralType>(extendType))
         {
-            return extendsType(srcType, literalType.getElementType(), typeParamsWithArgs);
+            return extendsType(location, srcType, literalType.getElementType(), typeParamsWithArgs);
         }        
 
-        if (auto unionType = srcType.dyn_cast<mlir_ts::UnionType>())
+        if (auto unionType = dyn_cast<mlir_ts::UnionType>(srcType))
         {
             auto falseResult = ExtendsResult::False;
             auto pred = [&](auto &item) { 
-                auto unionExtResult = extendsType(item, extendType, typeParamsWithArgs);
+                auto unionExtResult = extendsType(location, item, extendType, typeParamsWithArgs);
                 if (unionExtResult == ExtendsResult::Never)
                 {
                     falseResult = unionExtResult;
@@ -2360,9 +2462,9 @@ class MLIRTypeHelper
         }
 
         // seems it is generic interface
-        if (auto srcInterfaceType = srcType.dyn_cast<mlir_ts::InterfaceType>())
+        if (auto srcInterfaceType = dyn_cast<mlir_ts::InterfaceType>(srcType))
         {
-            if (auto extInterfaceType = extendType.dyn_cast<mlir_ts::InterfaceType>())
+            if (auto extInterfaceType = dyn_cast<mlir_ts::InterfaceType>(extendType))
             {
                 if (auto srcInterfaceInfo = getInterfaceInfoByFullName(srcInterfaceType.getName().getValue()))
                 {
@@ -2387,7 +2489,7 @@ class MLIRTypeHelper
                                         auto srcType = srcFound->getValue().second;
                                         auto extType = extFound->getValue().second;
 
-                                        return extendsType(srcType, extType, typeParamsWithArgs);
+                                        return extendsType(location, srcType, extType, typeParamsWithArgs);
                                     }
                                     else
                                     {
@@ -2404,9 +2506,9 @@ class MLIRTypeHelper
             }
         }
 
-        if (auto srcClassType = srcType.dyn_cast<mlir_ts::ClassType>())
+        if (auto srcClassType = dyn_cast<mlir_ts::ClassType>(srcType))
         {
-            if (auto extClassType = extendType.dyn_cast<mlir_ts::ClassType>())
+            if (auto extClassType = dyn_cast<mlir_ts::ClassType>(extendType))
             {
                 if (auto srcClassInfo = getClassInfoByFullName(srcClassType.getName().getValue()))
                 {
@@ -2431,7 +2533,7 @@ class MLIRTypeHelper
                                         auto srcType = srcFound->getValue().second;
                                         auto extType = extFound->getValue().second;
 
-                                        return extendsType(srcType, extType, typeParamsWithArgs);
+                                        return extendsType(location, srcType, extType, typeParamsWithArgs);
                                     }
                                     else
                                     {
@@ -2450,12 +2552,12 @@ class MLIRTypeHelper
 
         if (isAnyFunctionType(srcType) && isAnyFunctionType(extendType))
         {
-            return extendsTypeFuncTypes(srcType, extendType, typeParamsWithArgs);
+            return extendsTypeFuncTypes(location, srcType, extendType, typeParamsWithArgs);
         }
 
-        if (auto constructType = extendType.dyn_cast<mlir_ts::ConstructFunctionType>())
+        if (auto constructType = dyn_cast<mlir_ts::ConstructFunctionType>(extendType))
         {
-            if (auto srcClassType = srcType.dyn_cast<mlir_ts::ClassType>())
+            if (auto srcClassType = dyn_cast<mlir_ts::ClassType>(srcType))
             {
                 if (auto srcClassInfo = getClassInfoByFullName(srcClassType.getName().getValue()))
                 {
@@ -2472,21 +2574,21 @@ class MLIRTypeHelper
                         constrMethod->funcType.getInputs(), 
                         {srcClassInfo->classType}, 
                         constrMethod->funcType.isVarArg());
-                    return extendsTypeFuncTypes(constrWithRetType, extendType, typeParamsWithArgs, 1/*because of this param*/);
+                    return extendsTypeFuncTypes(location, constrWithRetType, extendType, typeParamsWithArgs, 1/*because of this param*/);
                 }
             }
 
             return ExtendsResult::False;
         }
 
-        if (auto ifaceType = srcType.dyn_cast<mlir_ts::InterfaceType>())
+        if (auto ifaceType = dyn_cast<mlir_ts::InterfaceType>(srcType))
         {
             auto interfaceInfo = getInterfaceInfoByFullName(ifaceType.getName().getValue());
             assert(interfaceInfo);
             auto falseResult = ExtendsResult::False;
             for (auto extend : interfaceInfo->extends)
             {
-                auto extResult = extendsType(extend.second->interfaceType, extendType, typeParamsWithArgs);
+                auto extResult = extendsType(location, extend.second->interfaceType, extendType, typeParamsWithArgs);
                 if (isTrue(extResult))
                 {
                     return extResult;
@@ -2501,14 +2603,14 @@ class MLIRTypeHelper
             return falseResult;
         }
 
-        if (auto classType = srcType.dyn_cast<mlir_ts::ClassType>())
+        if (auto classType = dyn_cast<mlir_ts::ClassType>(srcType))
         {
             auto classInfo = getClassInfoByFullName(classType.getName().getValue());
             assert(classInfo);
             auto falseResult = ExtendsResult::False;
             for (auto extend : classInfo->baseClasses)
             {
-                auto extResult = extendsType(extend->classType, extendType, typeParamsWithArgs);
+                auto extResult = extendsType(location, extend->classType, extendType, typeParamsWithArgs);
                 if (extResult == ExtendsResult::True)
                 {
                     return ExtendsResult::True;
@@ -2520,11 +2622,11 @@ class MLIRTypeHelper
                 }                  
             }
 
-            if (auto ifaceType = extendType.dyn_cast<mlir_ts::InterfaceType>())
+            if (auto ifaceType = dyn_cast<mlir_ts::InterfaceType>(extendType))
             {
                 for (auto extend : classInfo->implements)
                 {
-                    auto extResult = extendsType(extend.interface->interfaceType, extendType, typeParamsWithArgs);
+                    auto extResult = extendsType(location, extend.interface->interfaceType, extendType, typeParamsWithArgs);
                     if (isTrue(extResult))
                     {
                         return extResult;
@@ -2540,13 +2642,20 @@ class MLIRTypeHelper
             return falseResult;
         }
 
-        if (auto objType = extendType.dyn_cast<mlir_ts::ObjectType>())
+        if (auto objType = dyn_cast<mlir_ts::ObjectType>(extendType))
         {
-            if (objType.getStorageType().isa<mlir_ts::AnyType>())
+            if (isa<mlir_ts::AnyType>(objType.getStorageType()))
             {
-                return (srcType.isa<mlir_ts::TupleType>() || srcType.isa<mlir_ts::ConstTupleType>() || srcType.isa<mlir_ts::ObjectType>()) 
+                return (isa<mlir_ts::TupleType>(srcType) || isa<mlir_ts::ConstTupleType>(srcType) || isa<mlir_ts::ObjectType>(srcType)) 
                     ? ExtendsResult::True : ExtendsResult::False;
             }
+        }        
+
+        // TODO: do we need to check types inside?
+        if ((isa<mlir_ts::TypePredicateType>(srcType) || isa<mlir_ts::BooleanType>(srcType))
+            && (isa<mlir_ts::TypePredicateType>(extendType) || isa<mlir_ts::BooleanType>(extendType)))
+        {
+            return ExtendsResult::True;
         }        
 
         // TODO: finish Function Types, etc
@@ -2558,7 +2667,7 @@ class MLIRTypeHelper
     {
         for (auto itemType : unionType.getTypes())
         {
-            if (itemType.isa<mlir_ts::NullType>())
+            if (isa<mlir_ts::NullType>(itemType))
             {
                 continue;
             }
@@ -2583,36 +2692,36 @@ class MLIRTypeHelper
 
     mlir::LogicalResult processUnionTypeItem(mlir::Type type, UnionTypeProcessContext &unionContext)
     {
-        if (type.isa<mlir_ts::UndefinedType>())
+        if (isa<mlir_ts::UndefinedType>(type))
         {
             unionContext.isUndefined = true;
             return mlir::success();
         }
 
-        if (type.isa<mlir_ts::NullType>())
+        if (isa<mlir_ts::NullType>(type))
         {
             unionContext.isNullable = true;
             return mlir::success();
         }            
 
-        if (type.isa<mlir_ts::AnyType>())
+        if (isa<mlir_ts::AnyType>(type))
         {
             unionContext.isAny = true;
             return mlir::success();
         }
 
-        if (type.isa<mlir_ts::NeverType>())
+        if (isa<mlir_ts::NeverType>(type))
         {
             return mlir::success();
         }
 
-        if (auto literalType = type.dyn_cast<mlir_ts::LiteralType>())
+        if (auto literalType = dyn_cast<mlir_ts::LiteralType>(type))
         {
             unionContext.literalTypes.insert(literalType);
             return mlir::success();
         }
 
-        if (auto optionalType = type.dyn_cast<mlir_ts::OptionalType>())
+        if (auto optionalType = dyn_cast<mlir_ts::OptionalType>(type))
         {
             if (unionContext.isUndefined)
             {
@@ -2626,7 +2735,7 @@ class MLIRTypeHelper
             return mlir::success();
         }
 
-        if (auto unionType = type.dyn_cast<mlir_ts::UnionType>())
+        if (auto unionType = dyn_cast<mlir_ts::UnionType>(type))
         {
             if (mlir::succeeded(processUnionType(unionType, unionContext)))
             {
@@ -2648,14 +2757,14 @@ class MLIRTypeHelper
         return mlir::success();
     }
 
-    mlir::Type getUnionType(mlir::Type type1, mlir::Type type2, bool mergeLiterals = true, bool mergeTypes = true)
+    mlir::Type getUnionType(mlir::Location location, mlir::Type type1, mlir::Type type2, bool mergeLiterals = true, bool mergeTypes = true)
     {
-        if (canCastFromTo(type1, type2))
+        if (canCastFromTo(location, type1, type2))
         {
             return type2;
         }
 
-        if (canCastFromTo(type2, type1))
+        if (canCastFromTo(location, type2, type1))
         {
             return type1;
         }
@@ -2663,18 +2772,18 @@ class MLIRTypeHelper
         mlir::SmallVector<mlir::Type> types;
         types.push_back(type1);
         types.push_back(type2);
-        return getUnionTypeWithMerge(types, mergeLiterals, mergeTypes);
+        return getUnionTypeWithMerge(location, types, mergeLiterals, mergeTypes);
     }
 
     // TODO: review all union merge logic
-    mlir::Type getUnionTypeMergeTypes(UnionTypeProcessContext &unionContext, bool mergeLiterals = true, bool mergeTypes = true)
+    mlir::Type getUnionTypeMergeTypes(mlir::Location location, UnionTypeProcessContext &unionContext, bool mergeLiterals = true, bool mergeTypes = true)
     {
         // merge types with literal types
         for (auto literalType : unionContext.literalTypes)
         {
             if (mergeLiterals)
             {
-                auto baseType = literalType.cast<mlir_ts::LiteralType>().getElementType();
+                auto baseType = mlir::cast<mlir_ts::LiteralType>(literalType).getElementType();
                 if (unionContext.types.count(baseType))
                 {
                     continue;
@@ -2701,7 +2810,7 @@ class MLIRTypeHelper
         {
             typesAll.push_back(type);
             isAllValueTypes &= isValueType(type);
-            isAllLiteralTypes &= type.isa<mlir_ts::LiteralType>();
+            isAllLiteralTypes &= isa<mlir_ts::LiteralType>(type);
         }
 
         if ((isAllValueTypes || isAllLiteralTypes) && unionContext.isNullable)
@@ -2726,7 +2835,7 @@ class MLIRTypeHelper
         if (mergeTypes && !doNotMergeLiterals)
         {
             mlir::SmallVector<mlir::Type> mergedTypesAll;
-            this->mergeTypes(typesAll, mergedTypesAll);
+            this->mergeTypes(location, typesAll, mergedTypesAll);
 
             mlir::Type retType = mergedTypesAll.size() == 1 ? mergedTypesAll.front() : getUnionType(mergedTypesAll);
             if (unionContext.isUndefined)
@@ -2751,37 +2860,37 @@ class MLIRTypeHelper
         // check if type is nullable or undefinable
         for (auto type : types)
         {
-            if (type.isa<mlir_ts::UndefinedType>() || type.isa<mlir_ts::OptionalType>())
+            if (isa<mlir_ts::UndefinedType>(type) || isa<mlir_ts::OptionalType>(type))
             {
                 unionContext.isUndefined = true;
                 continue;
             }
 
-            if (type.isa<mlir_ts::NullType>())
+            if (isa<mlir_ts::NullType>(type))
             {
                 unionContext.isNullable = true;
                 continue;
             }            
 
-            if (type.isa<mlir_ts::AnyType>())
+            if (isa<mlir_ts::AnyType>(type))
             {
                 unionContext.isAny = true;
                 continue;
             }
 
-            if (type.isa<mlir_ts::NeverType>())
+            if (isa<mlir_ts::NeverType>(type))
             {
                 continue;
             }
 
-            if (auto unionType = type.dyn_cast<mlir_ts::UnionType>())
+            if (auto unionType = dyn_cast<mlir_ts::UnionType>(type))
             {
                 detectTypeForGroupOfTypes(unionType.getTypes(), unionContext);
             }
         }
     }
 
-    mlir::Type getUnionTypeWithMerge(mlir::ArrayRef<mlir::Type> types, bool mergeLiterals = true, bool mergeTypes = true)
+    mlir::Type getUnionTypeWithMerge(mlir::Location location, mlir::ArrayRef<mlir::Type> types, bool mergeLiterals = true, bool mergeTypes = true)
     {
         UnionTypeProcessContext unionContext = {};
 
@@ -2803,7 +2912,7 @@ class MLIRTypeHelper
             processUnionTypeItem(type, unionContext);
         }
 
-        return getUnionTypeMergeTypes(unionContext, mergeLiterals, mergeTypes);
+        return getUnionTypeMergeTypes(location, unionContext, mergeLiterals, mergeTypes);
     }
 
     mlir::Type getUnionType(mlir::SmallVector<mlir::Type> &types)
@@ -2829,7 +2938,7 @@ class MLIRTypeHelper
         auto isUndefined = false;
         for (auto type : types)
         {
-            if (type.isa<mlir_ts::UndefinedType>())
+            if (isa<mlir_ts::UndefinedType>(type))
             {
                 isUndefined = true; 
                 continue;
@@ -2895,7 +3004,7 @@ class MLIRTypeHelper
             getClassInfoByFullName, getGenericClassInfoByFullName, 
             getInterfaceInfoByFullName, getGenericInterfaceInfoByFullName
         );
-        return iter.some(type, [](mlir::Type type) { return type && type.isa<mlir_ts::NamedGenericType>(); });
+        return iter.some(type, [](mlir::Type type) { return type && isa<mlir_ts::NamedGenericType>(type); });
     }
 
     bool hasInferType(mlir::Type type)
@@ -2904,7 +3013,7 @@ class MLIRTypeHelper
             getClassInfoByFullName, getGenericClassInfoByFullName, 
             getInterfaceInfoByFullName, getGenericInterfaceInfoByFullName
         );
-        return iter.some(type, [](mlir::Type type) { return type && type.isa<mlir_ts::InferType>(); });
+        return iter.some(type, [](mlir::Type type) { return type && isa<mlir_ts::InferType>(type); });
     }    
 
     bool getAllInferTypes(mlir::Type type, SmallVector<mlir_ts::InferType> &inferTypes)
@@ -2914,7 +3023,7 @@ class MLIRTypeHelper
             getInterfaceInfoByFullName, getGenericInterfaceInfoByFullName
         );
         return iter.every(type, [&](mlir::Type type) { 
-            if (auto inferType = type.dyn_cast<mlir_ts::InferType>())
+            if (auto inferType = dyn_cast<mlir_ts::InferType>(type))
             {
                 inferTypes.push_back(inferType);
             }
@@ -2923,7 +3032,7 @@ class MLIRTypeHelper
         });
     }        
     
-    void mergeTypes(mlir::ArrayRef<mlir::Type> types, mlir::SmallVector<mlir::Type> &mergedTypes)
+    void mergeTypes(mlir::Location location, mlir::ArrayRef<mlir::Type> types, mlir::SmallVector<mlir::Type> &mergedTypes)
     {
         for (auto typeItem : types)
         {
@@ -2937,7 +3046,7 @@ class MLIRTypeHelper
             for (auto [index, mergedType] : enumerate(mergedTypes))
             {
                 auto merged = false;
-                auto resultType = mergeType(mergedType, typeItem, merged);
+                auto resultType = mergeType(location, mergedType, typeItem, merged);
                 if (merged)
                 {
                     mergedTypes[index] = resultType;
@@ -2953,7 +3062,7 @@ class MLIRTypeHelper
         }
     }
 
-    mlir::Type arrayMergeType(mlir::Type existType, mlir::Type currentType, bool& merged)
+    mlir::Type arrayMergeType(mlir::Location location, mlir::Type existType, mlir::Type currentType, bool& merged)
     {
         LLVM_DEBUG(llvm::dbgs() << "\n!! merging existing type: " << existType << " with " << currentType << "\n";);
 
@@ -2964,18 +3073,18 @@ class MLIRTypeHelper
         }
 
         // in case of array
-        auto currentTypeArray = currentType.dyn_cast_or_null<mlir_ts::ArrayType>();
-        auto existTypeArray = existType.dyn_cast_or_null<mlir_ts::ArrayType>();
+        auto currentTypeArray = dyn_cast_or_null<mlir_ts::ArrayType>(currentType);
+        auto existTypeArray = dyn_cast_or_null<mlir_ts::ArrayType>(existType);
         if (currentTypeArray && existTypeArray)
         {
-            auto arrayElementMerged = mergeType(existTypeArray.getElementType(), currentTypeArray.getElementType(), merged);   
+            auto arrayElementMerged = mergeType(location, existTypeArray.getElementType(), currentTypeArray.getElementType(), merged);   
             return mlir_ts::ArrayType::get(arrayElementMerged);
         }
 
-        return mergeType(existType, currentType, merged);
+        return mergeType(location, existType, currentType, merged);
     }
 
-    mlir::Type tupleMergeType(mlir_ts::TupleType existType, mlir_ts::TupleType currentType, bool& merged)
+    mlir::Type tupleMergeType(mlir::Location location, mlir_ts::TupleType existType, mlir_ts::TupleType currentType, bool& merged)
     {
         merged = false;
         LLVM_DEBUG(llvm::dbgs() << "\n!! merging existing type: " << existType << " with " << currentType << "\n";);
@@ -3006,7 +3115,7 @@ class MLIRTypeHelper
 
             // try to merge types of tuple
             auto merged = false;
-            auto mergedType = mergeType(existingIt->type, currentIt->type, merged);
+            auto mergedType = mergeType(location, existingIt->type, currentIt->type, merged);
             if (mergedType)
             {
                 resultFields.push_back({ existingIt->id, mergedType, false });
@@ -3017,7 +3126,7 @@ class MLIRTypeHelper
         return mlir_ts::TupleType::get(context, resultFields);
     }
 
-    mlir::Type mergeType(mlir::Type existType, mlir::Type currentType, bool& merged)
+    mlir::Type mergeType(mlir::Location location, mlir::Type existType, mlir::Type currentType, bool& merged)
     {
         merged = false;
         LLVM_DEBUG(llvm::dbgs() << "\n!! merging existing \n\ttype: \t" << existType << "\n\twith \t" << currentType << "\n";);
@@ -3028,13 +3137,13 @@ class MLIRTypeHelper
             return existType;
         }
 
-        if (canCastFromTo(currentType, existType))
+        if (canCastFromTo(location, currentType, existType))
         {
             merged = true;
             return existType;
         }
 
-        if (canCastFromTo(existType, currentType))
+        if (canCastFromTo(location, existType, currentType))
         {
             merged = true;
             return currentType;
@@ -3052,12 +3161,12 @@ class MLIRTypeHelper
         auto resType = wideStorageType(currentType);
 
         // check if can merge tuple types
-        if (auto existingTupleType = existType.dyn_cast<mlir_ts::TupleType>())
+        if (auto existingTupleType = dyn_cast<mlir_ts::TupleType>(existType))
         {
-            if (auto currentTupleType = currentType.dyn_cast<mlir_ts::TupleType>())
+            if (auto currentTupleType = dyn_cast<mlir_ts::TupleType>(currentType))
             {
                 auto tupleMerged = false;
-                auto mergedTupleType = tupleMergeType(existingTupleType, currentTupleType, tupleMerged);
+                auto mergedTupleType = tupleMergeType(location, existingTupleType, currentTupleType, tupleMerged);
                 if (tupleMerged)
                 {
                     merged = true;
@@ -3075,9 +3184,9 @@ class MLIRTypeHelper
             types.push_back(existType);
             types.push_back(currentType);
 
-            if (existType.isa<mlir_ts::UnionType>())
+            if (isa<mlir_ts::UnionType>(existType))
             {
-                defaultUnionType = getUnionTypeWithMerge(types);
+                defaultUnionType = getUnionTypeWithMerge(location, types);
             }
             else
             {
@@ -3093,320 +3202,6 @@ class MLIRTypeHelper
 
         merged = true;
         return resType;
-    }
-
-    template <typename T, typename F>
-    void printFuncType(T &out, F t)
-    {
-        out << "(";
-        auto first = true;
-        auto index = 0;
-        auto size = t.getInputs().size();
-        auto isVar = t.getIsVarArg();
-        for (auto subType : t.getInputs())
-        {
-            if (!first)
-            {
-                out << ", ";
-            }
-
-            if (isVar && size == 1)
-            {
-                out << "...";
-            }
-
-            out << "p" << index << ": ";
-
-            printType(out, subType);
-            first = false;
-            index ++;
-            size --;
-        }
-        out << ") => ";
-
-        if (t.getNumResults() == 0)
-        {
-            out << "void";
-        }
-        else if (t.getNumResults() == 1)
-        {
-            printType(out, t.getResults().front());
-        }
-        else
-        {
-            out << "[";
-            auto first = true;
-            for (auto subType : t.getResults())
-            {
-                if (!first)
-                {
-                    out << ", ";
-                }
-
-                printType(out, subType);
-                first = false;
-            }
-
-            out << "]";
-        }
-    }
-
-    template <typename T, typename TPL>
-    void printFields(T &out, TPL t)
-    {
-        auto first = true;
-        for (auto field : t.getFields())
-        {
-            if (!first)
-            {
-                out << ", ";
-            }
-
-            if (field.id)
-            {
-                printAttribute(out, field.id);
-                out << ":";
-            }
-
-            printType(out, field.type);
-            first = false;
-        }
-    }    
-
-    template <typename T, typename TPL>
-    void printTupleType(T &out, TPL t)
-    {
-        out << "[";
-        printFields(out, t);
-        out << "]";        
-    }
-
-    template <typename T, typename TPL>
-    void printObjectType(T &out, TPL t)
-    {
-        out << "{";
-        printFields(out, t);
-        out << "}";        
-    }
-
-    template <typename T, typename U>
-    void printUnionType(T &out, U t, const char *S)
-    {
-        auto first = true;
-        for (auto subType : t.getTypes())
-        {
-            if (!first)
-            {
-                out << S;
-            }
-
-            printType(out, subType);
-            first = false;
-        }        
-    }
-    
-    template <typename T>
-    void printAttribute(T &out, mlir::Attribute attr)
-    {
-        llvm::TypeSwitch<mlir::Attribute>(attr)
-            .template Case<mlir::StringAttr>([&](auto a) {
-                out << a.str().c_str();
-            })
-            .template Case<mlir::FlatSymbolRefAttr>([&](auto a) {
-                out << a.getValue().str().c_str();
-            })            
-            .template Case<mlir::IntegerAttr>([&](auto a) {
-                SmallVector<char> Str;
-                a.getValue().toStringUnsigned(Str);
-                StringRef strRef(Str.data(), Str.size());
-                out << strRef.str().c_str();
-            })
-            .Default([](mlir::Attribute a) { 
-                LLVM_DEBUG(llvm::dbgs() << "\n!! Type print is not implemented for : " << a << "\n";);
-                llvm_unreachable("not implemented");
-            });
-    }
-
-    template <typename T>
-    void printType(T &out, mlir::Type type)
-    {
-        llvm::TypeSwitch<mlir::Type>(type)
-            .template Case<mlir_ts::NullType>([&](auto t) {
-                out << "null";
-            })
-            .template Case<mlir_ts::UndefinedType>([&](auto t) {
-                out << "undefined";
-            })
-            .template Case<mlir_ts::ArrayType>([&](auto t) {
-                printType(out, t.getElementType());
-                out << "[]";
-            })
-            .template Case<mlir_ts::BoundFunctionType>([&](auto t) {
-                printFuncType(out, t);
-            })
-            .template Case<mlir_ts::BoundRefType>([&](auto t) {
-                printType(out, t.getElementType());
-            })
-            .template Case<mlir_ts::ClassType>([&](auto t) {
-                out << t.getName().getValue().str().c_str();
-            })
-            .template Case<mlir_ts::ClassStorageType>([&](auto t) {
-                printTupleType(out, t);                                
-            })
-            .template Case<mlir_ts::InterfaceType>([&](auto t) {
-                out << t.getName().getValue().str().c_str();
-            })
-            .template Case<mlir_ts::ConstArrayType>([&](auto t) {
-                printType(out, t.getElementType());
-                out << "[]";
-            })
-            .template Case<mlir_ts::ConstArrayValueType>([&](auto t) {
-                printType(out, t.getElementType());
-                out << "[]";
-            })
-            .template Case<mlir_ts::ConstTupleType>([&](auto t) {
-                printTupleType(out, t);
-            })
-            .template Case<mlir_ts::EnumType>([&](auto t) {
-                printType(out, t.getElementType());
-            })
-            .template Case<mlir_ts::FunctionType>([&](auto t) {
-                printFuncType(out, t);
-            })
-            .template Case<mlir_ts::HybridFunctionType>([&](auto t) {
-                printFuncType(out, t);
-            })
-            .template Case<mlir_ts::ConstructFunctionType>([&](auto t) {
-                out << "new ";
-                printFuncType(out, t);
-            })
-            .template Case<mlir_ts::InferType>([&](auto t) {
-                out << "infer ";
-                printType(out, t.getElementType());
-            })
-            .template Case<mlir_ts::LiteralType>([&](auto t) {
-                printType(out, t.getElementType());
-            })
-            .template Case<mlir_ts::OptionalType>([&](auto t) {
-                printType(out, t.getElementType());
-                out << " | undefined";
-            })
-            .template Case<mlir_ts::RefType>([&](auto t) {
-                out << "Reference<";
-                printType(out, t.getElementType());
-                out << ">";
-            })
-            .template Case<mlir_ts::TupleType>([&](auto t) {
-                printTupleType(out, t);
-            })
-            .template Case<mlir_ts::UnionType>([&](auto t) {
-                printUnionType(out, t, " | ");
-            })
-            .template Case<mlir_ts::IntersectionType>([&](auto t) {
-                printUnionType(out, t, " & ");
-            })
-            .template Case<mlir_ts::ValueRefType>([&](auto t) {
-                printType(out, t.getElementType());
-            })
-            .template Case<mlir_ts::ConditionalType>([&](auto t) {
-                printType(out, t.getCheckType());
-                out << "extends";
-                printType(out, t.getCheckType());
-                out << " ? ";
-                printType(out, t.getTrueType());
-                out << " : ";
-                printType(out, t.getFalseType());
-            })
-            .template Case<mlir_ts::IndexAccessType>([&](auto t) {
-                printType(out, t.getType());
-                out << "[";
-                printType(out, t.getIndexType());
-                out << "]";
-            })
-            .template Case<mlir_ts::KeyOfType>([&](auto t) {
-                out << "keyof ";
-                printType(out, t.getElementType());
-            })
-            .template Case<mlir_ts::MappedType>([&](auto t) {
-                out << "[";
-                printType(out, t.getElementType());
-                out << " of ";
-                printType(out, t.getNameType());
-                out << " extends ";
-                printType(out, t.getConstrainType());
-                out << "]";
-            })
-            .template Case<mlir_ts::TypeReferenceType>([&](auto t) {
-                printAttribute(out, t.getName());
-                if (t.getTypes().size() > 0)
-                {
-                    out << "<";
-                    auto first = true;
-                    for (auto subType : t.getTypes())
-                    {
-                        if (!first)
-                        {
-                            out << ", ";
-                        }
-
-                        printType(out, subType);
-                        first = false;
-                    }
-                    out << ">";
-                }
-            })
-            .template Case<mlir_ts::TypePredicateType>([&](auto t) {
-                printType(out, t.getElementType());
-            })
-            .template Case<mlir_ts::NamedGenericType>([&](auto t) {
-                out << t.getName().getValue().str().c_str();
-            })
-            .template Case<mlir_ts::ObjectType>([&](auto t) {
-                out << "object";
-            })
-            .template Case<mlir_ts::NeverType>([&](auto) { 
-                out << "never";
-            })
-            .template Case<mlir_ts::UnknownType>([&](auto) {
-                out << "unknown";
-            })
-            .template Case<mlir_ts::AnyType>([&](auto) {
-                out << "any";
-            })
-            .template Case<mlir_ts::NumberType>([&](auto) {
-                out << "number";
-            })
-            .template Case<mlir_ts::StringType>([&](auto) {
-                out << "string";
-            })
-            .template Case<mlir_ts::BooleanType>([&](auto) {
-                out << "boolean";
-            })
-            .template Case<mlir_ts::OpaqueType>([&](auto) {
-                out << "Opaque";
-            })
-            .template Case<mlir_ts::VoidType>([&](auto) {
-                out << "void";
-            })
-            .template Case<mlir_ts::ConstType>([&](auto) {
-                out << "const";
-            })
-            .template Case<mlir::NoneType>([&](auto) {
-                out << "void";
-            })
-            .template Case<mlir::IntegerType>([&](auto) {
-                out << "TypeOf<1>";
-            })
-            .template Case<mlir::FloatType>([&](auto) {
-                out << "TypeOf<1.0>";
-            })
-            .template Case<mlir::IndexType>([&](auto) {
-                out << "TypeOf<1>";
-            })
-            .Default([](mlir::Type t) { 
-                LLVM_DEBUG(llvm::dbgs() << "\n!! Type print is not implemented for : " << t << "\n";);
-                llvm_unreachable("not implemented");
-            });
     }
 
 protected:

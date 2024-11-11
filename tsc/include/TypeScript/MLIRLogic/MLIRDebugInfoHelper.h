@@ -33,7 +33,7 @@ class MLIRDebugInfoHelper
 
     mlir::Location stripMetadata(mlir::Location location) 
     {
-        if (auto fusedLoc = location.dyn_cast<mlir::FusedLoc>())
+        if (auto fusedLoc = dyn_cast<mlir::FusedLoc>(location))
         {
             if (fusedLoc.getMetadata()) 
             {
@@ -42,6 +42,26 @@ class MLIRDebugInfoHelper
         }
 
         return location;        
+    }
+
+    mlir::Location combineWithFileScope(mlir::Location location)
+    {
+        if (auto fileScope = dyn_cast_or_null<mlir::LLVM::DIScopeAttr>(debugScope.lookup(FILE_DEBUG_SCOPE)))
+        {
+            return combine(location, fileScope);          
+        }
+
+        return location;
+    }
+
+    mlir::Location combineWithCompileUnitScope(mlir::Location location)
+    {
+        if (auto cuScope = dyn_cast_or_null<mlir::LLVM::DIScopeAttr>(debugScope.lookup(CU_DEBUG_SCOPE)))
+        {
+            return combine(location, cuScope);          
+        }
+
+        return location;
     }
 
     mlir::Location combineWithCurrentScope(mlir::Location location)
@@ -74,6 +94,16 @@ class MLIRDebugInfoHelper
         return combineWithCurrentScope(combineWithName(location, name));
     }
 
+    mlir::Location combineWithFileScopeAndName(mlir::Location location, StringRef name)
+    {
+        return combineWithFileScope(combineWithName(location, name));
+    }    
+
+    mlir::Location combineWithCompileUnitScopeAndName(mlir::Location location, StringRef name)
+    {
+        return combineWithCompileUnitScope(combineWithName(location, name));
+    }    
+
     void clearDebugScope() 
     {
         debugScope.insert(DEBUG_SCOPE, mlir::LLVM::DIScopeAttr());
@@ -97,10 +127,12 @@ class MLIRDebugInfoHelper
             unsigned sourceLanguage = llvm::dwarf::DW_LANG_C; 
             auto producer = builder.getStringAttr(producerName);
             auto emissionKind = mlir::LLVM::DIEmissionKind::Full;
-            auto compileUnit = mlir::LLVM::DICompileUnitAttr::get(builder.getContext(), sourceLanguage, file, producer, isOptimized, emissionKind);        
+            auto namedTable = mlir::LLVM::DINameTableKind::Default;
+            auto compileUnit = mlir::LLVM::DICompileUnitAttr::get(
+                builder.getContext(), DistinctAttr::create(builder.getUnitAttr()), sourceLanguage, file, producer, isOptimized, emissionKind, namedTable);        
         
             debugScope.insert(CU_DEBUG_SCOPE, compileUnit);
-            debugScope.insert(DEBUG_SCOPE, file);
+            debugScope.insert(DEBUG_SCOPE, compileUnit);
 
             return combine(location, compileUnit);
         }
@@ -108,7 +140,7 @@ class MLIRDebugInfoHelper
         return location;
     }
 
-    mlir::Location getSubprogram(mlir::Location functionLocation, StringRef functionName, mlir::Location functionBlockLocation) {
+    mlir::Location getSubprogram(mlir::Location functionLocation, StringRef functionName, StringRef linkageName, mlir::Location functionBlockLocation) {
 
         if (auto compileUnitAttr = dyn_cast_or_null<mlir::LLVM::DICompileUnitAttr>(debugScope.lookup(CU_DEBUG_SCOPE)))
         {
@@ -117,7 +149,7 @@ class MLIRDebugInfoHelper
                 auto [line, column] = LocationHelper::getLineAndColumn(functionLocation);
                 auto [scopeLine, scopeColumn] = LocationHelper::getLineAndColumn(functionBlockLocation);
 
-                // if (scopeAttr.isa<mlir::LLVM::DILexicalBlockAttr>())
+                // if (isa<mlir::LLVM::DILexicalBlockAttr>(scopeAttr))
                 // {
                 //     auto file = dyn_cast<mlir::LLVM::DIFileAttr>(debugScope.lookup(FILE_DEBUG_SCOPE));
 
@@ -142,9 +174,10 @@ class MLIRDebugInfoHelper
                 auto type = mlir::LLVM::DISubroutineTypeAttr::get(builder.getContext(), llvm::dwarf::DW_CC_normal, {/*Add Types here*/});
 
                 auto funcNameAttr = builder.getStringAttr(functionName);
+                auto linkageNameAttr = builder.getStringAttr(linkageName);
                 auto subprogramAttr = mlir::LLVM::DISubprogramAttr::get(
-                    builder.getContext(), compileUnitAttr, scopeAttr, 
-                    funcNameAttr, funcNameAttr, 
+                    builder.getContext(), DistinctAttr::create(builder.getUnitAttr()), compileUnitAttr, scopeAttr, 
+                    funcNameAttr, linkageNameAttr, 
                     compileUnitAttr.getFile(), line, scopeLine, subprogramFlags, type);   
 
                 debugScope.insert(SUBPROGRAM_DEBUG_SCOPE, subprogramAttr);
@@ -178,6 +211,17 @@ class MLIRDebugInfoHelper
             }
         }
     }    
+
+    void setNamespace(mlir::Location namespaceLocation, StringRef namespaceName, bool exportSymbols) {
+        if (auto scopeAttr = dyn_cast_or_null<mlir::LLVM::DIScopeAttr>(debugScope.lookup(DEBUG_SCOPE)))
+        {        
+            auto namespaceAttr = mlir::LLVM::DINamespaceAttr::get(
+                builder.getContext(), builder.getStringAttr(namespaceName), scopeAttr, exportSymbols);
+
+            debugScope.insert(NAMESPACE_DEBUG_SCOPE, namespaceAttr);
+            debugScope.insert(DEBUG_SCOPE, namespaceAttr);
+        }
+    }
 
 private:
     mlir::FusedLoc combine(mlir::Location location, mlir::LLVM::DIScopeAttr scope)

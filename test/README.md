@@ -1,8 +1,16 @@
 cd ..
 
-./prepare_3rdParty.sh
+cd 3rdParty
 
-update CMake or change required CMakeLists.txt files to use the current version
+git clone --depth 1 https://github.com/llvm/llvm-project.git
+
+cd ..
+
+sudo apt install ninja-build
+
+install CMake https://askubuntu.com/a/865294
+
+./prepare_3rdParty_release.sh
 
 cd tsc
 
@@ -112,4 +120,68 @@ define void @main() local_unnamed_addr {
 attributes #0 = { mustprogress nofree nounwind willreturn allockind("alloc,uninitialized") allocsize(0) memory(inaccessiblemem: readwrite) "alloc-family"="malloc" }
 attributes #1 = { nofree nounwind }
 attributes #2 = { nofree nosync nounwind memory(none) }
+```
+
+- Example closure:
+```
+function c1() {
+    let x = 1;
+    function f() {
+        return ++x;
+    }
+    return f() + f();
+}
+
+function main() {
+    print(c1());
+}
+```
+```
+@frmt_4606706533159743250 = internal constant [3 x i8] c"%d\00"
+
+declare ptr @malloc(i64)
+
+declare void @free(ptr)
+
+declare i32 @puts(ptr)
+
+declare i32 @snprintf(ptr, i32, ptr, ...)
+
+define i32 @.f_c1.f(ptr %0) {
+  %2 = alloca i32, align 4
+  %3 = getelementptr { ptr }, ptr %0, i32 0, i32 0
+  %4 = load ptr, ptr %3, align 8
+  %5 = load i32, ptr %4, align 4
+  %6 = add i32 %5, 1
+  store i32 %6, ptr %4, align 4
+  store i32 %6, ptr %2, align 4
+  %7 = load i32, ptr %2, align 4
+  ret i32 %7
+}
+
+define i32 @c1() {
+  %1 = alloca i32, align 4
+  %2 = call ptr @malloc(i64 ptrtoint (ptr getelementptr (i32, ptr null, i64 1) to i64))
+  store i32 1, ptr %2, align 4
+  %3 = call ptr @malloc(i64 ptrtoint (ptr getelementptr ({ ptr }, ptr null, i64 1) to i64))
+  %4 = getelementptr { ptr }, ptr %3, i32 0, i32 0
+  store ptr %2, ptr %4, align 8
+  %5 = call i32 @.f_c1.f(ptr %3)
+  %6 = call ptr @malloc(i64 ptrtoint (ptr getelementptr ({ ptr }, ptr null, i64 1) to i64))
+  %7 = getelementptr { ptr }, ptr %6, i32 0, i32 0
+  store ptr %2, ptr %7, align 8
+  %8 = call i32 @.f_c1.f(ptr %6)
+  %9 = add i32 %5, %8
+  store i32 %9, ptr %1, align 4
+  %10 = load i32, ptr %1, align 4
+  ret i32 %10
+}
+
+define void @main() {
+  %1 = call i32 @c1()
+  %2 = call ptr @malloc(i64 50)
+  %3 = call i32 (ptr, i32, ptr, ...) @snprintf(ptr %2, i32 50, ptr @frmt_4606706533159743250, i32 %1)
+  %4 = call i32 @puts(ptr %2)
+  ret void
+}
 ```

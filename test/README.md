@@ -6,7 +6,7 @@ git clone --depth 1 https://github.com/llvm/llvm-project.git
 
 cd ..
 
-sudo apt install ninja-build
+sudo apt install ninja-build python-yaml
 
 install CMake https://askubuntu.com/a/865294
 
@@ -17,6 +17,13 @@ cd tsc
 ./config_tsc_release.sh
 
 ./build_tsc_release.sh
+
+
+Try wasm:
+
+./scripts/config_llvm_wasm_release.sh
+
+./scripts/build_llvm_wasm_release.sh
 
 Notes:
 - Example fib and its compiled LLVM IR, optimized LLVM IR (https://godbolt.org/z/c7MfKTKqe):
@@ -353,3 +360,7 @@ main:                                   # @main
 frmt_4606706533159743250:
         .asciz  "%d"
 ```
+
+
+Notes:
+- https://godbolt.org/z/h4naoa1Kc

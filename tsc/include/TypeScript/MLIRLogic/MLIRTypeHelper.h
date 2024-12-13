@@ -6,6 +6,7 @@
 #include "TypeScript/MLIRLogic/MLIRGenStore.h"
 #include "TypeScript/MLIRLogic/MLIRTypeIterator.h"
 #include "TypeScript/MLIRLogic/MLIRHelper.h"
+#include "TypeScript/MLIRLogic/MLIRPrinter.h"
 
 #include "llvm/Support/Debug.h"
 #include "llvm/ADT/APSInt.h"
@@ -617,17 +618,27 @@ class MLIRTypeHelper
     }
 
     // TODO: how about multi-index?
-    mlir::Type getIndexSignatureElementType(mlir::Type indexSignatureType)
+    std::pair<mlir::Type, mlir::Type> getIndexSignatureArgumentAndResultTypes(mlir::Type indexSignatureType)
     {
         if (auto funcType = dyn_cast<mlir_ts::FunctionType>(indexSignatureType))
         {
-            if (funcType.getNumInputs() == 1 && funcType.getNumResults() == 1 && isNumericType(funcType.getInput(0)))
+            if (funcType.getNumInputs() == 1 && funcType.getNumResults() == 1 
+                && (isNumericType(funcType.getInput(0)) || isa<mlir_ts::StringType>(funcType.getInput(0))))
             {
-                return funcType.getResult(0);
+                return {funcType.getInput(0), funcType.getResult(0)};
             }
+
+            // in case if first parameter is Opaque
+            if (funcType.getNumInputs() == 2 && funcType.getNumResults() == 1 
+                && (isNumericType(funcType.getInput(1)) || isa<mlir_ts::StringType>(funcType.getInput(1))))
+            {
+                return {funcType.getInput(1), funcType.getResult(0)};
+            }            
         }
 
-        return mlir::Type();
+        assert(false);
+
+        return {mlir::Type(), mlir::Type()};
     }
 
     mlir::Type getIndexSignatureType(mlir::Type elementType)
@@ -639,6 +650,26 @@ class MLIRTypeHelper
 
         return mlir_ts::FunctionType::get(context, {mlir_ts::NumberType::get(context)}, {elementType}, false);
     }
+
+    mlir_ts::FunctionType getIndexGetFunctionType(mlir::Type indexSignature)
+    {
+        auto [arg, res] = getIndexSignatureArgumentAndResultTypes(indexSignature);
+        return mlir_ts::FunctionType::get(
+            indexSignature.getContext(), 
+            {getOpaqueType(), arg}, 
+            {res}, 
+            false);    
+    }
+
+    mlir_ts::FunctionType getIndexSetFunctionType(mlir::Type indexSignature)
+    {
+        auto [arg, res] = getIndexSignatureArgumentAndResultTypes(indexSignature);        
+        return mlir_ts::FunctionType::get(
+            indexSignature.getContext(), 
+            {getOpaqueType(), arg, res}, 
+            {}, 
+            false);    
+    }    
 
     bool isAnyFunctionType(mlir::Type funcType, bool stripRefTypeOpt = false)
     {
@@ -1290,6 +1321,14 @@ class MLIRTypeHelper
         return getInterfaceVirtualTableForObject(location, tupleStorageType, newInterfacePtr, virtualTable, suppressErrors);
     }
 
+    std::string to_print(mlir::Type type)
+    {
+        std::stringstream exportType;
+        MLIRPrinter mp{};
+        mp.printType<std::ostream>(exportType, type);
+        return exportType.str();      
+    }
+
     mlir::LogicalResult getInterfaceVirtualTableForObject(mlir::Location location, mlir_ts::TupleType tupleStorageType,
                                                           InterfaceInfo::TypePtr newInterfacePtr,
                                                           SmallVector<VirtualMethodOrFieldInfo> &virtualTable,
@@ -1302,7 +1341,7 @@ class MLIRTypeHelper
 
         auto result = newInterfacePtr->getVirtualTable(
             virtualTable,
-            [&](mlir::Attribute id, mlir::Type fieldType, bool isConditional) -> mlir_ts::FieldInfo {
+            [&](mlir::Attribute id, mlir::Type fieldType, bool isConditional) -> std::pair<mlir_ts::FieldInfo, mlir::LogicalResult> {
                 auto foundIndex = tupleStorageType.getIndex(id);
                 if (foundIndex >= 0)
                 {
@@ -1314,69 +1353,69 @@ class MLIRTypeHelper
                     {
                         LLVM_DEBUG(llvm::dbgs() << "field " << id << " not matching type: " << fieldType << " and "
                                             << foundField.type << " in interface '" << newInterfacePtr->fullName
-                                            << "' for object '" << tupleStorageType << "'";);                                    
+                                            << "' for object '" << to_print(tupleStorageType) << "'";);                                    
 
                         if (!suppressErrors)
                         {
                             emitError(location) << "field " << id << " not matching type: " << fieldType << " and "
                                                 << foundField.type << " in interface '" << newInterfacePtr->fullName
-                                                << "' for object '" << tupleStorageType << "'";
+                                                << "' for object '" << to_print(tupleStorageType) << "'";
+
+                            return {emptyFieldInfo, mlir::failure()};
                         }
 
-                        return emptyFieldInfo;
+                        return {emptyFieldInfo, mlir::success()};
                     }
 
-                    return foundField;
+                    return {foundField, mlir::success()};
                 }
 
                 LLVM_DEBUG(llvm::dbgs() << id << " field can't be found for interface '"
-                                    << newInterfacePtr->fullName << "' in object '" << tupleStorageType << "'";);
+                                    << newInterfacePtr->fullName << "' in object '" << to_print(tupleStorageType) << "'";);
 
                 if (!isConditional && !suppressErrors)
                 {
-                    emitError(location)  << id << " field can't be found for interface '"
-                                        << newInterfacePtr->fullName << "' in object '" << tupleStorageType << "'";
+                    emitError(location) << id << " field can't be found for interface '"
+                                        << newInterfacePtr->fullName << "' in object '" << to_print(tupleStorageType) << "'";
+                    return {emptyFieldInfo, mlir::failure()};
                 }
 
-                return emptyFieldInfo;
+                return {emptyFieldInfo, mlir::success()};
             },
-            [&](std::string methodName, mlir_ts::FunctionType funcType, bool isConditional, int interfacePosIndex) -> MethodInfo & {
-                llvm_unreachable("not implemented yet");
-                /*
+            [&](std::string methodName, mlir_ts::FunctionType funcType, bool isConditional, int interfacePosIndex) -> std::pair<MethodInfo &, mlir::LogicalResult> {
                 auto id = MLIRHelper::TupleFieldName(methodName, funcType.getContext());
                 auto foundIndex = tupleStorageType.getIndex(id);
                 if (foundIndex >= 0)
                 {
                     auto foundField = tupleStorageType.getFieldInfo(foundIndex);
                     auto test = isa<mlir_ts::FunctionType>(foundField.type)
-                                    ? TestFunctionTypesMatchWithObjectMethods(foundField.type, funcType).result ==
+                                    ? TestFunctionTypesMatchWithObjectMethods(location, foundField.type, funcType).result ==
                                           MatchResultType::Match
                                     : funcType == foundField.type;
                     if (!test)
                     {
-                        LLVM_DEBUG(llvm::dbgs() << "method " << id << " not matching type: " << funcType << " and "
-                                            << foundField.type << " in interface '" << newInterfacePtr->fullName
-                                            << "' for object '" << tupleStorageType << "'";);                                    
+                        LLVM_DEBUG(llvm::dbgs() << "method " << id << " not matching type: " << to_print(funcType) << " and "
+                                            << to_print(foundField.type) << " in interface '" << newInterfacePtr->fullName
+                                            << "' for object '" << to_print(tupleStorageType) << "'";);                                    
 
                         if (!suppressErrors)
                         {
-                            emitError(location) << "method " << id << " not matching type: " << funcType << " and "
-                                                << foundField.type << " in interface '" << newInterfacePtr->fullName
-                                                << "' for object '" << tupleStorageType << "'";
+                            emitError(location) << "method " << id << " not matching type: " << to_print(funcType) << " and "
+                                                << to_print(foundField.type) << " in interface '" << newInterfacePtr->fullName
+                                                << "' for object '" << to_print(tupleStorageType) << "'";
+
+                            return {emptyMethod, mlir::failure()};
                         }
 
-                        return emptyMethod;
-                    }           
+                        return {emptyMethod, mlir::success()};
+                    }         
 
-                    MethodInfo foundMethod{};
-                    foundMethod.name = methodName;
-                    foundMethod.funcType = cast<mlir_ts::FunctionType>(foundField.type);
-                    // TODO: you need to load function from object
-                    //foundMethod.funcOp
-                    return foundMethod;
+                    // TODO: we do not return method, as it should be resolved in fields request
                 }
-                */
-            });
+
+                return {emptyMethod, mlir::success()};
+            },
+            true);
 
         return result;
     }
@@ -2018,7 +2057,6 @@ class MLIRTypeHelper
             // TODO: do not break the order as it is used in Debug info
             destTupleFields.push_back({ mlir::Attribute(), mlir_ts::NumberType::get(context), false });
             destTupleFields.push_back({ MLIRHelper::TupleFieldName(LENGTH_FIELD_NAME, context), mlir_ts::StringType::get(context), false });
-            //destTupleFields.push_back({ MLIRHelper::TupleFieldName(INDEX_ACCESS_FIELD_NAME, context), mlir_ts::NumberType::get(context), false });
             return mlir::success();
         }
         else if (auto optType = dyn_cast<mlir_ts::OptionalType>(srcType))
@@ -2054,6 +2092,40 @@ class MLIRTypeHelper
         return mlir::success();
     }
 
+    int getFieldIndexByFieldName(mlir::Type srcType, mlir::Attribute fieldName)
+    {
+        LLVM_DEBUG(llvm::dbgs() << "!! get index of field '" << fieldName << "' of '" << srcType << "'\n";);
+
+        if (auto constTupleType = dyn_cast<mlir_ts::ConstTupleType>(srcType))
+        {
+            return constTupleType.getIndex(fieldName);
+        }          
+        
+        if (auto tupleType = dyn_cast<mlir_ts::TupleType>(srcType))
+        {
+            return tupleType.getIndex(fieldName);
+        }  
+
+        llvm_unreachable("not implemented");
+    }
+
+    mlir::typescript::FieldInfo getFieldInfoByIndex(mlir::Type srcType, int index)
+    {
+        LLVM_DEBUG(llvm::dbgs() << "!! get #" << index << " of '" << srcType << "'\n";);
+
+        if (auto constTupleType = dyn_cast<mlir_ts::ConstTupleType>(srcType))
+        {
+            return constTupleType.getFieldInfo(index);
+        }          
+        
+        if (auto tupleType = dyn_cast<mlir_ts::TupleType>(srcType))
+        {
+            return tupleType.getFieldInfo(index);
+        }  
+
+        llvm_unreachable("not implemented");
+    }
+
     mlir::Type getFieldTypeByFieldName(mlir::Type srcType, mlir::Attribute fieldName)
     {
         LLVM_DEBUG(llvm::dbgs() << "!! get type of field '" << fieldName << "' of '" << srcType << "'\n";);
@@ -2084,8 +2156,7 @@ class MLIRTypeHelper
         {
             if (auto srcInterfaceInfo = getInterfaceInfoByFullName(srcInterfaceType.getName().getValue()))
             {
-                int totalOffset = 0;
-                auto fieldInfo = srcInterfaceInfo->findField(fieldName, totalOffset);
+                auto fieldInfo = srcInterfaceInfo->findField(fieldName);
                 if (fieldInfo)
                 {
                     return fieldInfo->type;
@@ -2093,7 +2164,7 @@ class MLIRTypeHelper
 
                 if (auto strName = dyn_cast<mlir::StringAttr>(fieldName))
                 {
-                    auto methodInfo = srcInterfaceInfo->findMethod(strName, totalOffset);
+                    auto methodInfo = srcInterfaceInfo->findMethod(strName);
                     if (methodInfo)
                     {
                         return methodInfo->funcType;
@@ -2112,8 +2183,7 @@ class MLIRTypeHelper
         {
             if (auto srcClassInfo = getInterfaceInfoByFullName(srcClassType.getName().getValue()))
             {
-                int totalOffset = 0;
-                auto fieldInfo = srcClassInfo->findField(fieldName, totalOffset);
+                auto fieldInfo = srcClassInfo->findField(fieldName);
                 if (fieldInfo)
                 {
                     return fieldInfo->type;
@@ -2121,7 +2191,7 @@ class MLIRTypeHelper
 
                 if (auto strName = dyn_cast<mlir::StringAttr>(fieldName))
                 {
-                    auto methodInfo = srcClassInfo->findMethod(strName, totalOffset);
+                    auto methodInfo = srcClassInfo->findMethod(strName);
                     if (methodInfo)
                     {
                         return methodInfo->funcType;
@@ -2145,9 +2215,16 @@ class MLIRTypeHelper
                 return mlir_ts::NumberType::get(context);
             }
 
-            if (fieldName == MLIRHelper::TupleFieldName(INDEX_ACCESS_FIELD_NAME, context))
+            // TODO: temp hack to support extends { readonly length: number; readonly [n: number]: ElementOfArray<A>; }
+            if (fieldName == MLIRHelper::TupleFieldName(INDEX_ACCESS_GET_FIELD_NAME, context))
             {
-                return  getIndexSignatureType(arrayType.getElementType());
+                return mlir_ts::AnyType::get(context);
+            }
+
+            // TODO: temp hack to support extends { readonly length: number; readonly [n: number]: ElementOfArray<A>; }
+            if (fieldName == MLIRHelper::TupleFieldName(INDEX_ACCESS_SET_FIELD_NAME, context))
+            {
+                return mlir_ts::AnyType::get(context);
             }
 
             llvm_unreachable("not implemented");
@@ -2161,9 +2238,10 @@ class MLIRTypeHelper
                 return mlir_ts::NumberType::get(context);
             }
 
-            if (fieldName == MLIRHelper::TupleFieldName(INDEX_ACCESS_FIELD_NAME, context))
+            // TODO: temp hack to support extends { readonly length: number; readonly [n: number]: ElementOfArray<A>; }
+            if (fieldName == MLIRHelper::TupleFieldName(INDEX_ACCESS_GET_FIELD_NAME, context))
             {
-                return  getIndexSignatureType(constArrayType.getElementType());
+                return mlir_ts::AnyType::get(context);
             }
 
             llvm_unreachable("not implemented");
@@ -2175,11 +2253,6 @@ class MLIRTypeHelper
             if (fieldName == MLIRHelper::TupleFieldName(LENGTH_FIELD_NAME, context))
             {
                 return mlir_ts::NumberType::get(context);
-            }
-
-            if (fieldName == MLIRHelper::TupleFieldName(INDEX_ACCESS_FIELD_NAME, context))
-            {
-                return  getIndexSignatureType(mlir_ts::CharType::get(context));
             }
 
             llvm_unreachable("not implemented");
@@ -3015,6 +3088,15 @@ class MLIRTypeHelper
         );
         return iter.some(type, [](mlir::Type type) { return type && isa<mlir_ts::InferType>(type); });
     }    
+
+    void forEachTypes(mlir::Type type, std::function<bool(mlir::Type)> f)
+    {
+        MLIRTypeIteratorLogic iter(
+            getClassInfoByFullName, getGenericClassInfoByFullName, 
+            getInterfaceInfoByFullName, getGenericInterfaceInfoByFullName
+        );
+        iter.forEach(type, f);
+    }  
 
     bool getAllInferTypes(mlir::Type type, SmallVector<mlir_ts::InferType> &inferTypes)
     {

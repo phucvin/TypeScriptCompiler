@@ -8,7 +8,99 @@
 [![Test Build (Windows)](https://github.com/ASDAlexander77/TypeScriptCompiler/actions/workflows/cmake-test-release-win.yml/badge.svg)](https://github.com/ASDAlexander77/TypeScriptCompiler/actions/workflows/cmake-test-release-win.yml)
 [![Test Build (Linux)](https://github.com/ASDAlexander77/TypeScriptCompiler/actions/workflows/cmake-test-release-linux.yml/badge.svg)](https://github.com/ASDAlexander77/TypeScriptCompiler/actions/workflows/cmake-test-release-linux.yml)
 
-# What's new 
+# What's new
+- Class from Tuple
+```TypeScript
+class Point {
+    x: number;
+    y: number;
+}
+
+class Line {
+    constructor(public start: Point, public end: Point) { }
+}
+
+const l = new Line({ x: 0, y: 1 }, { x: 1.0, y: 2.0 });
+```
+
+- Compile-time `if`s
+```TypeScript
+function isArray<T extends unknown[]>(value: T): value is T {
+    return true;
+}
+
+function gen<T>(t: T)
+{
+    if (isArray(t))
+    {
+        return t.length.toString();
+    }
+
+    return "int";
+}
+
+const v1 = gen<i32>(23); // result: int
+const v2 = gen<string[]>([]); // result: 0
+```
+
+- indexes for classes and interfaces, properties for interfaces
+```TypeScript
+class Test {
+    // declare index (to assing get/set methods to it)
+    [index1: number]: string;
+    
+    get(index: number): string {
+        return "index";
+    }
+
+    set(index: number, value: string) {
+    }
+
+    get val(): string {
+        return "prop";
+    }
+}
+
+interface ITest {
+    [index1: number]: string;
+
+    get val(): string;
+}
+
+const t = new Test();
+print(t[10]);
+
+const ti: ITest = t;
+print(ti[10]);
+print(ti.val);
+```
+
+- no need to define 'main' function
+```TypeScript
+const arr = [1, 2, 3, 4, 5];
+for (const b of arr)
+    print(b);
+``` 
+
+- Accessor for object fields
+```TypeScript
+let obj = {
+    p: 1.0,
+    get value() { return this.p; },
+    set value(v: number) { this.p = v; },
+}
+```
+
+- Class static block
+```TypeScript
+class C {
+    static x: number;
+    static {
+        C.x = 1;
+    }
+}
+```
+
 - Migrated to LLVM 19.1.3
 
 - improved ```generating debug information``` more info here: [Wiki:How-To](https://github.com/ASDAlexander77/TypeScriptCompiler/wiki/How-To#compile-and-debug-with-visual-studio-code)
@@ -90,7 +182,7 @@ class TempFile {
 - [more...](https://github.com/ASDAlexander77/TypeScriptCompiler/wiki/What's-new)
 
 # Planning
-- [x] Migrating to LLVM 17.0.2
+- [x] Migrating to LLVM 19.1.3
 - [x] Shared libraries
 - [ ] JavaScript Built-in classes library
 

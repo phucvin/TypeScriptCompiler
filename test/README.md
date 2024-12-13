@@ -25,6 +25,23 @@ Try wasm:
 
 ./scripts/build_llvm_wasm_release.sh
 
+
+Try building llvm alone:
+
+From https://stackoverflow.com/a/68753935:
+
+cd /workspaces
+
+git clone --depth 1 --branch llvmorg-19.1.3 https://github.com/llvm/llvm-project.git
+
+cmake -S llvm-project/llvm -B llvm-project/build -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_PROJECTS=all -DLLVM_ENABLE_RUNTIMES=all
+
+Adapt to the following based on ./scripts/build_llvm_release.sh
+
+cmake -S llvm-project/llvm -B llvm-project/build -G "Ninja" -DLLVM_TARGETS_TO_BUILD="host" -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_PROJECTS="clang;lld;mlir"
+
+cmake --build llvm-project/build -j8
+
 Notes:
 - Example fib and its compiled LLVM IR, optimized LLVM IR (https://godbolt.org/z/c7MfKTKqe):
 ```
